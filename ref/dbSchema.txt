@@ -1,0 +1,53 @@
+psql conceptdb postgres phdcs2014
+
+CREATE TABLE datasets(
+   ID SERIAL PRIMARY KEY NOT NULL,
+   name		TEXT    NOT NULL,
+   description		TEXT    NOT NULL,
+   has_time boolean,
+   has_rating boolean,
+   metadata TEXT
+);
+
+//metadata: whatever you want to store in there: real id, extra information
+//is_english will be decided in preprocessing, non-english review cannot be cleaned.
+CREATE TABLE rawdata(
+   ID SERIAL PRIMARY KEY NOT NULL,
+   datasetid		INT	references datasets(ID),
+   raw_text			TEXT NOT NULL,
+   rating			INT,
+   creation_time	BIGINT,
+   metadata         TEXT,
+   is_english   boolean
+);
+
+CREATE INDEX ON rawdata (datasetid);
+
+// all three options have corrected text before cleaning.
+CREATE TABLE cleanedText(
+   ID SERIAL PRIMARY KEY NOT NULL,
+   rawdataID		INT	references rawdata(ID),
+   spelling_correction_LV1	TEXT,
+   rootword_stemming_LV2	TEXT,
+   over_stemming_LV3	TEXT
+);
+
+CREATE INDEX ON cleanedText (rawdataID);
+
+// total count of each level should be -1 if this word isn't for that level.
+CREATE TABLE vocabulary(
+   ID SERIAL PRIMARY KEY NOT NULL,
+   text		TEXT NOT NULL,
+   datasetid		INT	references datasets(ID),
+   POS TEXT NOT NULL,
+   total_count_LV1 INT,
+   total_count_LV2 INT,
+   total_count_LV3 INT
+);
+
+CREATE TABLE word2vec(
+   word			TEXT PRIMARY KEY NOT NULL,
+   vector		TEXT
+);
+
+./word2vec -train reviewdataset.txt -output ReviewVectors.txt -cbow 1 -size 200 -window 8 -negative 25 -hs 0 -sample 1e-4 -threads 7 -binary 0 -iter 40
