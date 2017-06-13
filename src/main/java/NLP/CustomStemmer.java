@@ -495,8 +495,8 @@ public class CustomStemmer {
 		return stemNNS(thirdPersonSingularVerb);
 	}
 
-	public String[] stem(String[] pair) {
-		if(pair[0].equals("-lrb-"))
+	public String[] stem(String[] pair, boolean lite) {
+		if (pair[0].equals("-lrb-"))
 			System.err.println();
 		// Do not stem if this word contains number, we have no apparent rules
 		// for such words
@@ -528,7 +528,10 @@ public class CustomStemmer {
 					result[0] = stemVBD(pair[0]).intern();
 					break;
 				case "VBG":
-					result[0] = stemVBG(pair[0]).intern();
+					if (lite)
+						result[0] = pair[0].intern();
+					else
+						result[0] = stemVBG(pair[0]).intern();
 					break;
 				case "VBN":
 					result[0] = stemVBN(pair[0]).intern();
@@ -538,13 +541,17 @@ public class CustomStemmer {
 					break;
 
 				}
-				result[1] = "VB".intern();
-				result = SymSpell.getInstance().correctThisWord_POS(result);
+				if (pair[1].equals("VBG") && lite)
+					result[1] = pair[1].intern();
+				else {
+					result[1] = "VB".intern();
+					result = SymSpell.getInstance().correctThisWord_POS(result);
+				}
 				return result;
 
 			} else {
 
-				if (result[1]== null || result[0]==null) {
+				if (result[1] == null || result[0] == null) {
 					if (POSTagConverter.getInstance().getCode(pair[1]) != -1)
 						result = SymSpell.getInstance()
 								.correctThisWord_POS(pair);

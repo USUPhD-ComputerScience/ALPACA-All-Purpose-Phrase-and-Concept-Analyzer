@@ -10,6 +10,8 @@ import java.util.List;
 import java.util.Scanner;
 import java.util.Set;
 
+import javax.print.Doc;
+
 import org.tartarus.snowball.SnowballStemmer;
 
 import Datastores.DocumentDatasetDB;
@@ -77,25 +79,25 @@ public class TextNormalizer {
 	}
 
 	// will return null if the text is not english
-	public String normalize(String input) {
-		String[] taggedTokens = preprocessAndSplitToTaggedTokens(input);
-		if (taggedTokens == null)
-			return null;
-		List<String> correctedTaggedTokens = new ArrayList<>();
-		CustomStemmer stemmer = CustomStemmer.getInstance();
-		for (String taggedTok : taggedTokens) {
-			String[] pair = taggedTok.split("_");
-			pair[0] = pair[0].toLowerCase();
-			pair = stemmer.stem(pair);
-			correctedTaggedTokens.add(pair[0] + "_" + pair[1]);
-		}
-		String correctedTaggedText = NatureLanguageProcessor
-				.mergeIntoText(correctedTaggedTokens);
-		if (correctedTaggedText == null)
-			return null;
-		debug_println(correctedTaggedText);
-		return correctedTaggedText;
-	}
+//	public String normalize(String input) {
+//		String[] taggedTokens = preprocessAndSplitToTaggedTokens(input);
+//		if (taggedTokens == null)
+//			return null;
+//		List<String> correctedTaggedTokens = new ArrayList<>();
+//		CustomStemmer stemmer = CustomStemmer.getInstance();
+//		for (String taggedTok : taggedTokens) {
+//			String[] pair = taggedTok.split("_");
+//			pair[0] = pair[0].toLowerCase();
+//			pair = stemmer.stem(pair,false);
+//			correctedTaggedTokens.add(pair[0] + "_" + pair[1]);
+//		}
+//		String correctedTaggedText = NatureLanguageProcessor
+//				.mergeIntoText(correctedTaggedTokens);
+//		if (correctedTaggedText == null)
+//			return null;
+//		debug_println(correctedTaggedText);
+//		return correctedTaggedText;
+//	}
 
 	// check for non-english text using the method proposed in our publication
 	// biproportionThreshold: ratio of pair of english words to all words,
@@ -223,13 +225,16 @@ public class TextNormalizer {
 					case DocumentDatasetDB.LV1_SPELLING_CORRECTION:
 						break;
 					case DocumentDatasetDB.LV2_ROOTWORD_STEMMING:
-						pair = customStemmer.stem(pair);
+						pair = customStemmer.stem(pair,false);
 						break;
 					case DocumentDatasetDB.LV3_OVER_STEMMING:
 						// porter stemmer
 						stemmer.setCurrent(pair[0]);
 						stemmer.stem();
 						pair[0] = stemmer.getCurrent();
+						break;
+					case DocumentDatasetDB.LV4_ROOTWORD_STEMMING_LITE:
+						pair = customStemmer.stem(pair,true);
 						break;
 					}
 
@@ -361,12 +366,12 @@ public class TextNormalizer {
 		try {
 			List<List<String>> results = normalizer
 					.normalize_SplitSentence(
-							"Angry birds I love the new levels they (the new level. I meant the"
-									+ " new levels) are very challenging . You should make more levels . (random things) I"
+							"Angry birds I am loving the new levels they (the new level. I meant the"
+									+ " new levels that is going well) are very challenging . You should make more levels . (random things) I"
 									+ "love angry birds.And you should sign with sponge bob squarepants for"
 									+ " an app .And you should youse Billy Joel music for your background"
-									+ " sound.",
-							DocumentDatasetDB.LV2_ROOTWORD_STEMMING);
+									+ " sound. He is running",
+							DocumentDatasetDB.LV4_ROOTWORD_STEMMING_LITE);
 			for(List<String> sentence : results){
 				for(String word : sentence){
 					System.out.print(word + " ");

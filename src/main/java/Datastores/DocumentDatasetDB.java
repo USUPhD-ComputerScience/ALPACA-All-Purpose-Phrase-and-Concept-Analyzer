@@ -38,6 +38,7 @@ public class DocumentDatasetDB {
 	public static final int LV1_SPELLING_CORRECTION = 1;
 	public static final int LV2_ROOTWORD_STEMMING = 2;
 	public static final int LV3_OVER_STEMMING = 3;
+	public static final int LV4_ROOTWORD_STEMMING_LITE = 4;
 	private PostgreSQLConnector dbconnector;
 	private static DocumentDatasetDB instance = null;
 

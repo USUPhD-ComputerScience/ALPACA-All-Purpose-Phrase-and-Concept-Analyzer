@@ -319,21 +319,21 @@ public class NatureLanguageProcessor {
 	 * @param wordList
 	 *            - a List contains a String array of 2 elements: 0-word, 1-PoS
 	 */
-	public List<String[]> stem(List<String[]> wordList) {
-		List<String[]> results = new ArrayList<>();
-		CustomStemmer stemmer = CustomStemmer.getInstance();
-		for (String[] pair : wordList) {
-			if (pair.length < 2)
-				continue;
-			// System.out.print(count++ + ": " + pair[0]);
-			// if (!stopWordSet.contains(pair[0]))
-			pair = stemmer.stem(pair);
-
-			results.add(pair);
-			// System.out.println("-" + pair[0] + "<->" + pair[1]);
-		}
-		return results;
-	}
+//	public List<String[]> stem(List<String[]> wordList) {
+//		List<String[]> results = new ArrayList<>();
+//		CustomStemmer stemmer = CustomStemmer.getInstance();
+//		for (String[] pair : wordList) {
+//			if (pair.length < 2)
+//				continue;
+//			// System.out.print(count++ + ": " + pair[0]);
+//			// if (!stopWordSet.contains(pair[0]))
+//			pair = stemmer.stem(pair,false);
+//
+//			results.add(pair);
+//			// System.out.println("-" + pair[0] + "<->" + pair[1]);
+//		}
+//		return results;
+//	}
 
 	private void Porter2StemmerInit() throws ClassNotFoundException,
 			InstantiationException, IllegalAccessException {
