@@ -17,7 +17,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import TextNormalizer.TextNormalizer;
-import au.com.bytecode.opencsv.CSVReader;
 import edu.stanford.nlp.tagger.maxent.MaxentTagger;
 
 public class NatureLanguageProcessor {
@@ -37,10 +36,12 @@ public class NatureLanguageProcessor {
 			Arrays.asList(POSLIST));
 	private Set<String> stopWordSet;
 
-    private Set<String> badWordSet;// less extensive.
-    public Set<String> getBadWordSet() {
-        return badWordSet;
-    }
+	private Set<String> badWordSet;// less extensive.
+
+	public Set<String> getBadWordSet() {
+		return badWordSet;
+	}
+
 	public Set<String> getStopWordSet() {
 		return stopWordSet;
 	}
@@ -48,35 +49,35 @@ public class NatureLanguageProcessor {
 	public HashMap<String, String[]> getCorrectionMap() {
 		return correctionMap;
 	}
-    private void readBadWordsFromFile() {
-        badWordSet = new HashSet<>();
-        System.err
-                .println(">Read BadWords from file - bad.stop");
-        CSVReader reader = null;
-        try {
-            reader = new CSVReader(new FileReader(
-                    getClass().getClassLoader().getResource(TextNormalizer.getDictionaryDirectory()+"filtered\\bad.stop").getPath()));
-            String[] row = null;
-            while ((row = reader.readNext()) != null) {
-                badWordSet.add(row[0]);
-            }
-        } catch (FileNotFoundException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        } catch (IOException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        } finally {
-            if (reader != null) {
-                try {
-                    reader.close();
-                } catch (IOException e) {
-                    // TODO Auto-generated catch block
-                    e.printStackTrace();
-                }
-            }
-        }
-    }
+
+	private void readBadWordsFromFile() {
+		badWordSet = new HashSet<>();
+		System.err.println(">Read BadWords from file - bad.stop");
+		Scanner br = null;
+		try {
+			br = new Scanner(
+					new FileReader(
+							getClass().getClassLoader()
+									.getResource(TextNormalizer
+											.getDictionaryDirectory()
+											+ "filtered\\bad.stop")
+									.getPath()));
+			while (br.hasNext()) {
+				badWordSet.add(br.nextLine());
+			}
+		} catch (FileNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} finally {
+			if (br != null) {
+				br.close();
+			}
+		}
+	}
+
 	private static NatureLanguageProcessor instance = null;
 	MaxentTagger PoSTagger;
 	private static final Map<String, String> POSCorrectionMap = new HashMap<>();
@@ -127,12 +128,17 @@ public class NatureLanguageProcessor {
 
 	private NatureLanguageProcessor() {
 		readStopWordsFromFile();
-		PoSTagger = new MaxentTagger(
-				TextNormalizer.getDictionaryDirectory()+"POS/english-left3words-distsim.tagger");
+		PoSTagger = new MaxentTagger(TextNormalizer.getDictionaryDirectory()
+				+ "POS/english-left3words-distsim.tagger");
 		try {
-			loadCorrectionMap(new File(TextNormalizer.getDictionaryDirectory()+"Map/wordMapper.txt"),
-					new File(TextNormalizer.getDictionaryDirectory()+"Map/posMapper.txt"));
-			loadDictionary(new File(TextNormalizer.getDictionaryDirectory()+"improvised").listFiles());
+			loadCorrectionMap(
+					new File(TextNormalizer.getDictionaryDirectory()
+							+ "Map/wordMapper.txt"),
+					new File(TextNormalizer.getDictionaryDirectory()
+							+ "Map/posMapper.txt"));
+			loadDictionary(new File(
+					TextNormalizer.getDictionaryDirectory() + "improvised")
+							.listFiles());
 			Porter2StemmerInit();
 		} catch (Exception e) {
 			// TODO Auto-generated catch block
@@ -147,14 +153,16 @@ public class NatureLanguageProcessor {
 		Scanner reader = null;
 		try {
 			reader = new Scanner(
-					new FileReader(TextNormalizer.getDictionaryDirectory()+"stop/englishImprovised.stop"));
+					new FileReader(TextNormalizer.getDictionaryDirectory()
+							+ "stop/englishImprovised.stop"));
 			while (reader.hasNextLine()) {
-				
+
 				stopWordSet.add(reader.nextLine());
 			}
 
 			PrintWriter stop = new PrintWriter(
-					TextNormalizer.getDictionaryDirectory()+"stop/englishImprovised.stop");
+					TextNormalizer.getDictionaryDirectory()
+							+ "stop/englishImprovised.stop");
 			for (String w : stopWordSet)
 				stop.println(w);
 			stop.close();
@@ -237,7 +245,7 @@ public class NatureLanguageProcessor {
 		for (String tok : tokens) {
 			sb.append(tok).append(' ');
 		}
-		if(sb.length() <= 1)
+		if (sb.length() <= 1)
 			return null;
 		return sb.deleteCharAt(sb.length() - 1).toString();
 	}
@@ -268,7 +276,7 @@ public class NatureLanguageProcessor {
 			tokenList.add(sb.toString());
 		sb = null;
 
-		return  tokenList;
+		return tokenList;
 	}
 
 	public static List<String> extractWordsFromText(String text) {
@@ -319,21 +327,21 @@ public class NatureLanguageProcessor {
 	 * @param wordList
 	 *            - a List contains a String array of 2 elements: 0-word, 1-PoS
 	 */
-//	public List<String[]> stem(List<String[]> wordList) {
-//		List<String[]> results = new ArrayList<>();
-//		CustomStemmer stemmer = CustomStemmer.getInstance();
-//		for (String[] pair : wordList) {
-//			if (pair.length < 2)
-//				continue;
-//			// System.out.print(count++ + ": " + pair[0]);
-//			// if (!stopWordSet.contains(pair[0]))
-//			pair = stemmer.stem(pair,false);
-//
-//			results.add(pair);
-//			// System.out.println("-" + pair[0] + "<->" + pair[1]);
-//		}
-//		return results;
-//	}
+	// public List<String[]> stem(List<String[]> wordList) {
+	// List<String[]> results = new ArrayList<>();
+	// CustomStemmer stemmer = CustomStemmer.getInstance();
+	// for (String[] pair : wordList) {
+	// if (pair.length < 2)
+	// continue;
+	// // System.out.print(count++ + ": " + pair[0]);
+	// // if (!stopWordSet.contains(pair[0]))
+	// pair = stemmer.stem(pair,false);
+	//
+	// results.add(pair);
+	// // System.out.println("-" + pair[0] + "<->" + pair[1]);
+	// }
+	// return results;
+	// }
 
 	private void Porter2StemmerInit() throws ClassNotFoundException,
 			InstantiationException, IllegalAccessException {

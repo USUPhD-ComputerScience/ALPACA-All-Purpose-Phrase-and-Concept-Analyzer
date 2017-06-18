@@ -6,6 +6,7 @@ CREATE TABLE datasets(
    description		TEXT    NOT NULL,
    has_time boolean,
    has_rating boolean,
+   has_author boolean,
    metadata TEXT
 );
 
@@ -13,11 +14,11 @@ CREATE TABLE datasets(
 //is_english will be decided in preprocessing, non-english review cannot be cleaned.
 CREATE TABLE rawdata(
    ID SERIAL PRIMARY KEY NOT NULL,
-   datasetid		INT	references datasets(ID),
-   raw_text			TEXT NOT NULL,
-   rating			INT,
-   creation_time	BIGINT,
-   metadata         TEXT,
+   datasetid INT	references datasets(ID),
+   raw_data_file_name TEXT NOT NULL,
+   rating INT,
+   creation_time BIGINT,
+   author_file_name TEXT NOT NULL,
    is_english   boolean
 );
 
@@ -29,7 +30,8 @@ CREATE TABLE cleanedText(
    rawdataID		INT	references rawdata(ID),
    spelling_correction_LV1	TEXT,
    rootword_stemming_LV2	TEXT,
-   over_stemming_LV3	TEXT
+   over_stemming_LV3	TEXT,
+   rootword_stemming_lite_LV4	TEXT
 );
 
 CREATE INDEX ON cleanedText (rawdataID);
@@ -42,8 +44,11 @@ CREATE TABLE vocabulary(
    POS TEXT NOT NULL,
    total_count_LV1 INT,
    total_count_LV2 INT,
-   total_count_LV3 INT
+   total_count_LV3 INT,
+   total_count_LV4 INT,
+   UNIQUE (text, datasetid,POS)
 );
+
 
 CREATE TABLE word2vec(
    word			TEXT PRIMARY KEY NOT NULL,

@@ -1,34 +1,52 @@
 package Datastores;
 
+import java.io.File;
+import java.io.FileNotFoundException;
 import java.sql.SQLException;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Scanner;
 
+import TextNormalizer.TextNormalizer;
+import Utils.POSTagConverter;
+import Utils.Util;
+import Vocabulary.DBWord;
+import Vocabulary.Vocabulary;
 
 public class Document {
 	private int mID = -1;
-	private String mRawText = null;
+	private int mDatasetID = -1;
+	private String mRawText_fileName = null;
+	private String mAuthor_fileName = null;
 	private int mRating = -1;
 	private long mTime = -1;
 	private int[][] sentences;
-	private byte[][] postag;	
+	private byte[][] postag;
 	private int mLevel; // lv1, 2 or 3 of cleaned text
 	private boolean isEnglish = false;
 
 	public boolean isEnglish() {
 		return isEnglish;
 	}
-	public Document(int id, String raw_text, int rating, long time)
-			throws Exception {
+
+	public void setLevel(int level) {
+		mLevel = level;
+	}
+
+	public Document(int id, String raw_text, int rating, long time,
+			boolean english, int datasetID, String author_fn) throws Exception {
 		// TODO Auto-generated constructor stub
 		mID = id;
-		mRawText = raw_text;
+		mRawText_fileName = raw_text;
 		if (raw_text == null)
 			throw new Exception("Exception on document ID<" + id
 					+ ">: raw_text is null, which is not allowed!");
+		mAuthor_fileName = author_fn;
 		mRating = rating;
 		mTime = time;
+		isEnglish = english;
+		mDatasetID = datasetID;
 	}
 
 	@Override
@@ -50,15 +68,16 @@ public class Document {
 	@Override
 	public int hashCode() {
 		// TODO Auto-generated method stub
-		return mRawText.hashCode();
+		return mRawText_fileName.hashCode();
 	}
 
-	public int getDocumentID(){
+	public int getDocumentID() {
 		return mID;
 	}
-	public String getRawText() {
+
+	public String getRawTextFileName() {
 		// TODO Auto-generated method stub
-		return mRawText;
+		return mRawText_fileName;
 	}
 
 	public int getRating() {
@@ -66,9 +85,10 @@ public class Document {
 		return mRating;
 	}
 
-	public int getLevel(){
+	public int getLevel() {
 		return mLevel;
 	}
+
 	public long getTime() {
 		// TODO Auto-generated method stub
 		return mTime;
@@ -81,91 +101,137 @@ public class Document {
 	public void setSentences(int[][] sens) {
 		sentences = sens;
 	}
-//	
-//	/**
-//	 * Only for constructor. This function break a string into words in 4 steps:
-//	 * 
-//	 * <pre>
-//	 * - Step 1: Lower case
-//	 * - Step 2: PoS tagging
-//	 * - Step 3: Remove StopWord
-//	 * - Step 4: Use Snowball Stemming (Porter 2)
-//	 * </pre>
-//	 * 
-//	 * @param fullSentence
-//	 *            - The sentence to extract words from
-//	 * @return TRUE if it successfully extracted some words, FALSE otherwise
-//	 * @throws SQLException
-//	 * @throws ParseException
-//	 */
-//	public int extractSentences(int level) throws SQLException, ParseException {
-//		TextNormalizer.TextNormalizer normalizer = TextNormalizer.TextNormalizer.getInstance();
-//		Vocabulary voc = Vocabulary.getInstance();
-//
-//		// first, check if this is a new day: update information on all keywords
-//		// of this app.
-//		application.syncDayIndex(creationTime);
-//		// continue extracting sentences and keywords.
-//		// NatureLanguageProcessor nlp = NatureLanguageProcessor.getInstance();
-//		// String[] rawSentences = nlp.extractSentence(rawText);
-//		List<List<String>> normalizedSentences = normalizer
-//				.normalize_SplitSentence(rawText);
-//		// return and don't process further if this review is non english
-//		if (normalizedSentences == null) {
-//			isEnglish = false;
-//			return 0;
-//		}
-//		isEnglish = true;
-//		int[][] sentences_temp = new int[normalizedSentences.size()][0];
-//		int countValidSen = 0, countWord = 0;
-//		for (int i = 0; i < normalizedSentences.size(); i++) {
-//			List<Integer> wordIDList = new ArrayList<>();
-//			List<String> wordList = normalizedSentences.get(i);
-//
-//			// List<String> wordList =
-//			// nlp.extractWordsFromText(rawSentences[i]);
-//			// if (wordList == null)
-//			// return 0;
-//			// List<String[]> stemmedWordsWithPOS = nlp
-//			// .stem(nlp.findPosTag(wordList));
-//
-//			// if (stemmedWordsWithPOS != null) {
-//			// for (String[] pair : stemmedWordsWithPOS) {
-//			// if (pair.length != 2)
-//			// continue;
-//			// add into voc, get wordID as returning param
-//
-//			// }
-//			// }
-//			// if (!normalizer.isNonEnglish(wordList, 0.4, 0.5)) {
-//			for (String normalizedWord : wordList) {
-//				String[] pair = normalizedWord.split("_");
-//				if(pair.length == 0)
-//					continue;
-//				if(pair[0].length() == 0 || pair[1].length() == 0)
-//					continue;
-//				int wordid = voc.addWord(pair[0], pair[1], application,
-//						rating - 1, this);
-//				wordIDList.add(wordid);
-//				countWord++;
-//			}
-//			countValidSen++;
-//			sentences_temp[i] = Util.toIntArray(wordIDList);
-//			// }
-//		}
-//		// remove Sentences with no words
-//		sentences = new int[countValidSen][0];
-//		int index = 0;
-//		for (int[] sen : sentences_temp) {
-//			if (sen.length > 0)
-//				sentences[index++] = sen;
-//		}
-//		if (normalizedSentences.size() == 0
-//				|| countValidSen / normalizedSentences.size() < 0.6){
-//			isEnglish = false;
-//			return 0;
-//		}
-//		isEnglish = true;
-//		return countWord;
-//	}
+
+	/**
+	 * 1. split raw text into sentences 2. normalize the sentences according to
+	 * a level of normalization 3. save all the newly discovered words and
+	 * sentences into the database 4. return true if the process was done
+	 * nicely, return false if this is not an english document 4.a also update
+	 * isEnglish to the newly discovered english status of the document 4.b also
+	 * update english status to database
+	 * 
+	 * @param fullSentence
+	 *            - The sentence to extract words from
+	 * @return TRUE if it successfully extracted some words, FALSE otherwise
+	 * @throws Exception
+	 */
+	public boolean preprocess(int level, String directory) throws Exception {
+		TextNormalizer normalizer = TextNormalizer.getInstance();
+		Vocabulary voc = Vocabulary.getInstance();
+		POSTagConverter posconverter = POSTagConverter.getInstance();
+		DocumentDatasetDB db = DocumentDatasetDB.getInstance();
+		// NatureLanguageProcessor nlp = NatureLanguageProcessor.getInstance();
+		// String[] rawSentences = nlp.extractSentence(rawText);
+		String rawtext = readRawTextFromDirectory(directory);
+		List<List<String>> normalizedSentences = normalizer
+				.normalize_SplitSentence(rawtext, level);
+		// return and don't process further if this review is non english
+		if (normalizedSentences == null) {
+			isEnglish = false;
+			return false;
+		}
+		// update to English status
+		isEnglish = true;
+		int[][] sentences_temp = new int[normalizedSentences.size()][0];
+		int countValidSen = 0, countWord = 0;
+		for (int i = 0; i < normalizedSentences.size(); i++) {
+			List<Integer> wordIDList = new ArrayList<>();
+			List<String> wordList = normalizedSentences.get(i);
+
+			for (String normalizedWord : wordList) {
+				String[] pair = normalizedWord.split("_");
+				if (pair.length == 0)
+					continue;
+				if (pair[0].length() == 0 || pair[1].length() == 0)
+					continue;
+				int wordid = voc.addWord(pair[0], posconverter.getCode(pair[1]),
+						mDatasetID, level);
+				wordIDList.add(wordid);
+				countWord++;
+			}
+			countValidSen++;
+			sentences_temp[i] = Util.toIntArray(wordIDList);
+			// }
+		}
+		// remove Sentences with no words
+		sentences = new int[countValidSen][0];
+		int index = 0;
+		for (int[] sen : sentences_temp) {
+			if (sen.length > 0)
+				sentences[index++] = sen;
+		}
+		if (normalizedSentences.size() == 0
+				|| countValidSen / normalizedSentences.size() < 0.6) {
+			isEnglish = false;
+			return false;
+		}
+		isEnglish = true;
+		db.updateEnglishStatus(mID);
+		return true;
+	}
+
+	public String readRawTextFromDirectory(String directory)
+			throws FileNotFoundException {
+		Scanner rawtextFile = new Scanner(
+				new File(directory + "rawData//" + mRawText_fileName));
+		StringBuilder strbd = new StringBuilder();
+		try {
+
+			while (rawtextFile.hasNextLine()) {
+				strbd.append(rawtextFile.nextLine());
+			}
+		} finally {
+			rawtextFile.close();
+		}
+		return strbd.toString();
+	}
+
+	public String toString(boolean withPOS)
+			throws ClassNotFoundException, SQLException {
+		if (sentences == null)
+			return "";
+
+		Vocabulary voc = Vocabulary.getInstance();
+		StringBuilder strBld = new StringBuilder();
+		String prefix = "";
+		for (int[] sentence : sentences) {
+			for (int wordID : sentence) {
+				DBWord w;
+				w = voc.getWord(wordID);
+				if (w != null) {
+					strBld.append(prefix);
+					if (withPOS)
+						strBld.append(w.toString());
+					else
+						strBld.append(w.getText());
+					prefix = " ";
+				}
+			}
+			strBld.append(". ");
+		}
+		return strBld.toString();
+	}
+
+	public String toPOSString() throws ClassNotFoundException, SQLException {
+		if (sentences == null)
+			return "";
+
+		Vocabulary voc = Vocabulary.getInstance();
+		StringBuilder strBld = new StringBuilder();
+		String prefix = "";
+		for (int[] sentence : sentences) {
+			for (int wordID : sentence) {
+				DBWord w;
+				w = voc.getWord(wordID);
+				if (w != null) {
+					strBld.append(prefix);
+					strBld.append(
+							POSTagConverter.getInstance().getTag(w.getPOS()));
+					prefix = " ";
+				}
+			}
+			strBld.append(". ");
+		}
+		return strBld.toString();
+	}
 }

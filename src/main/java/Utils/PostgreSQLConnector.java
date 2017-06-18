@@ -25,7 +25,7 @@ public class PostgreSQLConnector {
 		return mConnect;
 	}
 
-	public PostgreSQLConnector(String user, String password, String database)
+	public PostgreSQLConnector(String user, String password, String database, String[] tables)
 			throws SQLException, ClassNotFoundException {
 		tryCreatingDatabase(database, user, password);
 		// TODO Auto-generated constructor stub
@@ -36,6 +36,7 @@ public class PostgreSQLConnector {
 		// statements allow to issue SQL queries to the database
 		mStatement = mConnect.createStatement();
 		mDatabase = database;
+		tryCreatingTables(tables);
 	}
 
 	public void tryCreatingDatabase(String database, String user,
@@ -50,6 +51,8 @@ public class PostgreSQLConnector {
 			String sql = "CREATE DATABASE " + database;
 			statement.executeUpdate(sql);
 			System.out.println("Database created!");
+			System.out.println("Creating tables");
+			
 		} catch (SQLException sqlException) {
 			if (sqlException.getErrorCode() == 1007) {
 				// Database already exists error
@@ -58,16 +61,22 @@ public class PostgreSQLConnector {
 				// Some other problems, e.g. Server down, no permission, etc
 				// sqlException.printStackTrace();
 			}
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
 		}
 	}
 
-	public void createTable(String sqlCreate) throws Exception{
-//		String sqlCreate = "CREATE TABLE IF NOT EXISTS data"
-//				+ "  (ID SERIAL PRIMARY KEY NOT NULL,"
-//				+ "   sectionID		INT," + "   question		TEXT,"
-//				+ "   criteria	TEXT," + "   URL1	TEXT,"
-//				+ "   justification1	TEXT)";
-			mStatement.execute(sqlCreate);
+	void tryCreatingTables(String[] tables){
+		for(String sqlCreateTable : tables){
+			try {
+				mStatement.execute(sqlCreateTable);
+			} catch (SQLException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			System.out.println(sqlCreateTable);
+		}
 	}
 
 	// if you dont have any condition, just pass null into it
@@ -136,8 +145,16 @@ public class PostgreSQLConnector {
 						+ table + " values (default," + dumbValues + ")");
 			}
 		} else {
-			preparedStatement = mConnect.prepareStatement(
-					"insert into  " + table + " values (" + dumbValues + ")");
+			if (returningID) {
+				preparedStatement = mConnect.prepareStatement(
+						"insert into  " + table + " values ("
+								+ dumbValues + ")",
+						Statement.RETURN_GENERATED_KEYS);
+			} else {
+				System.out.println(dumbValues);
+				preparedStatement = mConnect.prepareStatement("insert into  "
+						+ table + " values (" + dumbValues + ")");
+			}
 		}
 		// parameters start with 1
 		Array myArray;

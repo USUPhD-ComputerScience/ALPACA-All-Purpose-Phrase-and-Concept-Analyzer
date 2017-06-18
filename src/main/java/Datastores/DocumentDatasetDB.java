@@ -21,6 +21,8 @@ import java.util.Map.Entry;
 import org.postgresql.PGConnection;
 import org.postgresql.copy.CopyManager;
 
+import com.opencsv.CSVWriter;
+
 import NLP.NatureLanguageProcessor;
 import Utils.POSTagConverter;
 import Utils.PostgreSQLConnector;
@@ -41,13 +43,20 @@ public class DocumentDatasetDB {
 	public static final int LV4_ROOTWORD_STEMMING_LITE = 4;
 	private PostgreSQLConnector dbconnector;
 	private static DocumentDatasetDB instance = null;
+	// this has to be hard code in here to avoid user messing up with database
+	private static final String[] createTableSQL = new String[] {
+			"CREATE TABLE IF NOT EXISTS datasets(ID SERIAL PRIMARY KEY NOT NULL, name TEXT NOT NULL, description TEXT NOT NULL, has_time boolean, has_rating boolean, has_author boolean, metadata TEXT);	",
+			"CREATE TABLE IF NOT EXISTS rawdata(ID SERIAL PRIMARY KEY NOT NULL, datasetid INT	references datasets(ID), raw_data_file_name TEXT NOT NULL, rating INT, creation_time BIGINT, author_file_name TEXT, is_english boolean );",
+			"CREATE TABLE IF NOT EXISTS cleanedText( ID SERIAL PRIMARY KEY NOT NULL, rawdataID INT	references rawdata(ID), spelling_correction_LV1	TEXT, rootword_stemming_LV2 TEXT, over_stemming_LV3	TEXT, rootword_stemming_lite_LV4 TEXT);",
+			"CREATE TABLE vocabulary( ID SERIAL PRIMARY KEY NOT NULL, text TEXT NOT NULL, datasetid INT	references datasets(ID), POS TEXT NOT NULL, total_count_LV1 INT, total_count_LV2 INT, total_count_LV3 INT, total_count_LV4 INT, UNIQUE (text, datasetid,POS));",
+			"CREATE TABLE IF NOT EXISTS word2vec( word TEXT PRIMARY KEY NOT NULL, vector TEXT);" };
 
 	public static synchronized DocumentDatasetDB getInstance()
 			throws ClassNotFoundException, SQLException {
 		if (instance == null) {
 			instance = new DocumentDatasetDB();
 			instance.dbconnector = new PostgreSQLConnector(DBLOGIN, DBPASSWORD,
-					CONCEPTDB);
+					CONCEPTDB, createTableSQL);
 		}
 		return instance;
 	}
@@ -61,7 +70,7 @@ public class DocumentDatasetDB {
 			throws SQLException {
 		DatasetManager datasetMan = DatasetManager.getInstance();
 		String fields[] = { "ID", "name", "description", "has_time",
-				"has_rating" };
+				"has_rating", "has_author", "metadata" };
 
 		ResultSet results;
 		results = dbconnector.select(DATASETS_TABLE, fields, condition);
@@ -72,14 +81,39 @@ public class DocumentDatasetDB {
 			String description = results.getString("description");
 			boolean has_time = results.getBoolean("has_time");
 			boolean has_rating = results.getBoolean("has_rating");
-			datasetMan.addDataset(
-					new Dataset(ID, name, description, has_time, has_rating));
+			boolean has_author = results.getBoolean("has_author");
+			String metadata = results.getString("metadata");
+			datasetMan.addDataset(new Dataset(ID, name, description, has_time,
+					has_rating, has_author, metadata));
 		}
 		return datasetMan;
 	}
 
-	public Dataset querySingleDatasetInfo(Dataset dataset) throws Exception {
-		String fields[] = { "ID", "raw_text", "rating", "creation_time" };
+	public Dataset queryDatasetInfo(int datasetID) throws SQLException {
+		String fields[] = { "ID", "name", "description", "has_time",
+				"has_rating", "has_author", "metadata" };
+		String condition = "ID='" + datasetID + "'";
+		// condition = // "count>1000";
+
+		ResultSet results;
+		results = dbconnector.select(DATASETS_TABLE, fields, condition);
+		while (results.next()) {
+			String name = results.getString("name");
+			String description = results.getString("description");
+			boolean has_time = results.getBoolean("has_time");
+			boolean has_rating = results.getBoolean("has_rating");
+			boolean has_author = results.getBoolean("has_author");
+			String metadata = results.getString("metadata");
+			return new Dataset(datasetID, name, description, has_time,
+					has_rating, has_author, metadata);
+		}
+		return null;
+	}
+
+	public Dataset queryRawTextForSingleDataset(Dataset dataset)
+			throws Exception {
+		String fields[] = { "ID", "raw_data_file_name", "rating",
+				"creation_time", "is_english", "author_file_name" };
 		String condition = "datasetid='" + dataset.getID() + "'";
 		// condition = // "count>1000";
 
@@ -87,14 +121,19 @@ public class DocumentDatasetDB {
 		results = dbconnector.select(RAWDATA_TABLE, fields, condition);
 		while (results.next()) {
 			int id = results.getInt("ID");
-			String raw_text = results.getString("raw_text");
+			String raw_data_file_name = results.getString("raw_data_file_name");
 			int rating = -1;
 			if (dataset.hasRating())
 				rating = results.getInt("rating");
 			long time = -1;
 			if (dataset.hasTime())
 				time = results.getLong("creation_time");
-			Document doc = new Document(id, raw_text, rating, time);
+			boolean is_english = results.getBoolean("is_english");
+			String author_file_name = null;
+			if (dataset.hasAuthor())
+				author_file_name = results.getString("author_file_name");
+			Document doc = new Document(id, raw_data_file_name, rating, time,
+					is_english, dataset.getID(), author_file_name);
 			dataset.addDocument(doc);
 		}
 		return null;
@@ -142,42 +181,85 @@ public class DocumentDatasetDB {
 	// returnCount += revCount;
 	// dbconnector.update(APPS_TABLE, "count=" + returnCount, condition);
 	// }
+	public int insertRawData(String raw_text_filename, int rating, long time,
+			String author_fileName, int datasetId) throws SQLException {
+		String values[] = new String[6];
 
-	public boolean insertDocument(Document doc, String datasetId)
-			throws SQLException {
-		String values[] = new String[4];
-
-		values[0] = datasetId;
-		values[1] = doc.getRawText(); // appid
-		if (doc.getRating() == -1)
+		values[0] = datasetId + "";
+		values[1] = raw_text_filename;
+		if (rating == -1)
 			values[2] = "null";
 		else
-			values[2] = doc.getRating() + "";
-		if (doc.getTime() == -1)
+			values[2] = rating + "";
+		if (time == -1)
 			values[3] = "null";
 		else
-			values[3] = doc.getTime() + "";
-		int arrays[] = new int[] { 1, 0, 1, 2 };
-		int id = 0;
+			values[3] = time + "";
+		values[4] = author_fileName;
+		values[5] = "FALSE";
+		int arrays[] = new int[] { 1, 0, 1, 2, 0, 7 };
 		try {
-			id = dbconnector.insert(RAWDATA_TABLE, values, arrays, true, true);
+			return dbconnector.insert(RAWDATA_TABLE, values, arrays, true,
+					true);
 		} catch (SQLException e) {
 		}
-		if (id == 0)
-			return false;
-		return true;
+		return -1;
 	}
 
-	public void addNewDataset(String name, String description,
-			boolean hasRating, boolean hasTime) throws SQLException {
+	/**
+	 * Use this function to make a raw document to English status, default is
+	 * not english
+	 * 
+	 * @param ID
+	 *            of the raw document in db
+	 * @throws SQLException
+	 */
+	public void updateEnglishStatus(int rawID) throws SQLException {
+		// TODO Auto-generated method stub
+		String condition = "ID = '" + rawID + "'";
+		String updateContent = "is_english = TRUE";
+
+		dbconnector.update(RAWDATA_TABLE, updateContent, condition);
+	}
+
+	// public boolean insertDocument(Document doc, String datasetId)
+	// throws SQLException {
+	// String values[] = new String[4];
+	//
+	// values[0] = datasetId;
+	// values[1] = doc.getRawTextFileName(); // appid
+	// if (doc.getRating() == -1)
+	// values[2] = "null";
+	// else
+	// values[2] = doc.getRating() + "";
+	// if (doc.getTime() == -1)
+	// values[3] = "null";
+	// else
+	// values[3] = doc.getTime() + "";
+	// int arrays[] = new int[] { 1, 0, 1, 2 };
+	// int id = 0;
+	// try {
+	// id = dbconnector.insert(RAWDATA_TABLE, values, arrays, true, true);
+	// } catch (SQLException e) {
+	// }
+	// if (id == 0)
+	// return false;
+	// return true;
+	// }
+
+	public int addNewDataset(String name, String description, boolean hasRating,
+			boolean hasTime, boolean hasAuthor, String otherMetadata)
+			throws SQLException {
 
 		String values[] = new String[6];
 		values[0] = name;
 		values[1] = description;
 		values[2] = String.valueOf(hasRating);
 		values[3] = String.valueOf(hasTime);
-		int arrays[] = new int[] { 0, 0, 7, 7 };
-		dbconnector.insert(DATASETS_TABLE, values, arrays, false, false);
+		values[4] = String.valueOf(hasAuthor);
+		values[5] = otherMetadata;
+		int arrays[] = new int[] { 0, 0, 7, 7, 7, 0 };
+		return dbconnector.insert(DATASETS_TABLE, values, arrays, true, true);
 
 	}
 
@@ -187,14 +269,15 @@ public class DocumentDatasetDB {
 
 	public int addKeyWordToVocabulary(String w, String POS, int datasetID)
 			throws SQLException {
-		String values[] = new String[6];
+		String values[] = new String[7];
 		values[0] = w; // appid
 		values[1] = datasetID + "";
 		values[2] = POS;
-		values[3] = "0";
-		values[4] = "0";
-		values[5] = "0";
-		int arrays[] = new int[] { 0, 1, 0, 1, 1, 1 };
+		values[3] = "-1";
+		values[4] = "-1";
+		values[5] = "-1";
+		values[6] = "-1";
+		int arrays[] = new int[] { 0, 1, 0, 1, 1, 1, 1 };
 		return dbconnector.insert(VOCABULARY_TABLE, values, arrays, true, true);
 	}
 
@@ -212,6 +295,9 @@ public class DocumentDatasetDB {
 		}
 		if (lv == LV3_OVER_STEMMING) {
 			update = "total_count_LV3=" + totalCount;
+		}
+		if (lv == LV4_ROOTWORD_STEMMING_LITE) {
+			update = "total_count_LV4=" + totalCount;
 		}
 		return dbconnector.update(VOCABULARY_TABLE, update, "ID=" + wordid);
 	}
@@ -291,7 +377,7 @@ public class DocumentDatasetDB {
 	// }
 	public DBWord querySingleWord(int DBID) throws SQLException {
 		String fields[] = { "ID", "text", "datasetid", "POS", "total_count_LV1",
-				"total_count_LV2", "total_count_LV3" };
+				"total_count_LV2", "total_count_LV3", "total_count_LV4" };
 		String condition = "ID=" + DBID;
 		ResultSet results;
 		results = dbconnector.select(VOCABULARY_TABLE, fields, condition);
@@ -304,8 +390,9 @@ public class DocumentDatasetDB {
 			int total_count_LV1 = results.getInt("total_count_LV1");
 			int total_count_LV2 = results.getInt("total_count_LV2");
 			int total_count_LV3 = results.getInt("total_count_LV3");
+			int total_count_LV4 = results.getInt("total_count_LV4");
 			word = new DBWord(DBID, text, POS, datasetID, total_count_LV1,
-					total_count_LV2, total_count_LV3);
+					total_count_LV2, total_count_LV3, total_count_LV4);
 		}
 		return word;
 	}
@@ -314,7 +401,8 @@ public class DocumentDatasetDB {
 			throws SQLException {
 		List<DBWord> wordList = new ArrayList<>();
 		String fields[] = { "ID", "text", "datasetid", "POS", "total_count_LV1",
-				"total_count_LV2", "total_count_LV3" };
+				"total_count_LV2", "total_count_LV3", "total_count_LV4" };
+
 		String condition = "datasetid='" + dataset.getID() + "'";
 		switch (level) {
 		case LV1_SPELLING_CORRECTION:
@@ -326,6 +414,8 @@ public class DocumentDatasetDB {
 		case LV3_OVER_STEMMING:
 			condition += " AND total_count_LV3 > 0";
 			break;
+		case LV4_ROOTWORD_STEMMING_LITE:
+			condition += " AND total_count_LV4 > 0";
 		}
 		ResultSet results;
 		results = dbconnector.select(VOCABULARY_TABLE, fields, condition);
@@ -339,8 +429,9 @@ public class DocumentDatasetDB {
 			int total_count_LV1 = results.getInt("total_count_LV1");
 			int total_count_LV2 = results.getInt("total_count_LV2");
 			int total_count_LV3 = results.getInt("total_count_LV3");
+			int total_count_LV4 = results.getInt("total_count_LV4");
 			word = new DBWord(ID, text, POS, dataset.getID(), total_count_LV1,
-					total_count_LV2, total_count_LV3);
+					total_count_LV2, total_count_LV3, total_count_LV4);
 			wordList.add(word);
 		}
 		return wordList;
@@ -412,37 +503,48 @@ public class DocumentDatasetDB {
 						+ "'";
 				break;
 			case LV2_ROOTWORD_STEMMING:
-				updateContent = "spelling_correction_LV2 ='" + cleansedText
-						+ "'";
+				updateContent = "rootword_stemming_LV2 ='" + cleansedText + "'";
 				break;
 			case LV3_OVER_STEMMING:
-				updateContent = "spelling_correction_LV3 ='" + cleansedText
+				updateContent = "over_stemming_LV3 ='" + cleansedText + "'";
+				break;
+			case LV4_ROOTWORD_STEMMING_LITE:
+				updateContent = "rootword_stemming_lite_LV4 ='" + cleansedText
 						+ "'";
 				break;
 			}
 			int result = dbconnector.update(CLEANEDTEXT_TABLE, updateContent,
 					condition);
 			if (result == 0) { // 0 row affected
-				String values[] = new String[4];
+				String values[] = new String[5];
 				values[0] = doc.getDocumentID() + ""; // appid
 				switch (doc.getLevel()) {
 				case LV1_SPELLING_CORRECTION:
 					values[1] = cleansedText;
 					values[2] = "null";
 					values[3] = "null";
+					values[4] = "null";
 					break;
 				case LV2_ROOTWORD_STEMMING:
 					values[1] = "null";
 					values[2] = cleansedText;
 					values[3] = "null";
+					values[4] = "null";
 					break;
 				case LV3_OVER_STEMMING:
 					values[1] = "null";
 					values[2] = "null";
 					values[3] = cleansedText;
+					values[4] = "null";
+					break;
+				case LV4_ROOTWORD_STEMMING_LITE:
+					values[1] = "null";
+					values[2] = "null";
+					values[3] = "null";
+					values[4] = cleansedText;
 					break;
 				}
-				int arrays[] = new int[] { 1, 0, 0, 0 };
+				int arrays[] = new int[] { 1, 0, 0, 0, 0 };
 				dbconnector.insert(CLEANEDTEXT_TABLE, values, arrays, true,
 						true);
 			}

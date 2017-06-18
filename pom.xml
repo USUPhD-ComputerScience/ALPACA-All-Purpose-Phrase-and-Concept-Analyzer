@@ -34,9 +34,9 @@
 		</dependency>
 
 		<dependency>
-			<groupId>net.sf.opencsv</groupId>
+			<groupId>com.opencsv</groupId>
 			<artifactId>opencsv</artifactId>
-			<version>2.3</version>
+			<version>3.8</version>
 		</dependency>
 
 		<dependency>
