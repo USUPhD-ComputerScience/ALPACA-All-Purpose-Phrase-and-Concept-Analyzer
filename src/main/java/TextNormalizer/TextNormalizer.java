@@ -202,7 +202,7 @@ public class TextNormalizer {
 					}
 				}
 			} else {
-				if (pair[1].equals(",") || pair[1].equals("``")
+				if (/*pair[1].equals(",") ||*/ pair[1].equals("``")
 						|| pair[1].equals("''") || pair[1].equals("--")
 						|| pair[1].equals("$") || pair[1].equals("#")
 						|| pair[1].equals("SYM"))

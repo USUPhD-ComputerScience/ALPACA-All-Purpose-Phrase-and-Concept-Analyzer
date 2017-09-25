@@ -71,11 +71,11 @@ public class PostgreSQLConnector {
 		for(String sqlCreateTable : tables){
 			try {
 				mStatement.execute(sqlCreateTable);
+				System.out.println(sqlCreateTable);
 			} catch (SQLException e) {
 				// TODO Auto-generated catch block
-				e.printStackTrace();
+				//e.printStackTrace();
 			}
-			System.out.println(sqlCreateTable);
 		}
 	}
 

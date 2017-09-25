@@ -496,8 +496,6 @@ public class CustomStemmer {
 	}
 
 	public String[] stem(String[] pair, boolean lite) {
-		if (pair[0].equals("-lrb-"))
-			System.err.println();
 		// Do not stem if this word contains number, we have no apparent rules
 		// for such words
 		if (Util.hasNumeric(pair[0]))

@@ -105,7 +105,7 @@ public class Vocabulary {
 		return wordID;
 	}
 
-	public DBWord getWord(int keywordid) {
+	private DBWord getWord(int keywordid) {
 		return VocSearchForWord.get(keywordid);
 	}
 
@@ -126,6 +126,14 @@ public class Vocabulary {
 		}
 		System.out.println(">> Updated count for " + VocSearchForWord.size() + " words");
 		
+	}
+
+	public String getText(int id) throws Exception {
+		// TODO Auto-generated method stub
+		DBWord word = getWordFromDB(id);
+		if(word == null)
+			 throw new Exception("There is no word for the id = " + id);
+		return word.getText();
 	}
 
 }

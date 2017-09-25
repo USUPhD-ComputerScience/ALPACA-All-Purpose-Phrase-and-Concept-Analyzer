@@ -30,7 +30,7 @@ public class PreprocesorMain {
 				"D:\\EclipseWorkspace\\TextNormalizer\\config.INI");
 		int datasetID = readRawDataToDB(
 				"D:\\projects\\ALPACA\\NSF\\metadata.csv");
-		processDBData(datasetID, DocumentDatasetDB.LV4_ROOTWORD_STEMMING_LITE,
+		processDBData(datasetID, DocumentDatasetDB.LV2_ROOTWORD_STEMMING,
 				"D:\\projects\\ALPACA\\NSF\\", "D:\\projects\\ALPACA\\NSF\\");
 	}
 
@@ -62,7 +62,7 @@ public class PreprocesorMain {
 				csvwrt.close();
 				if (count % 100 == 0)
 					System.out.println(">> processed " + count + " documents ("
-							+ englishCount + "/" + count + " is English)");
+							+ englishCount + "/" + englishCount + " is English)");
 			}
 
 		}

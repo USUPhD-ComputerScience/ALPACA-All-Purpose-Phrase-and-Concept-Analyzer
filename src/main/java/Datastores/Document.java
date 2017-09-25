@@ -8,6 +8,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
 
+import org.apache.xalan.xsltc.compiler.sym;
+
 import TextNormalizer.TextNormalizer;
 import Utils.POSTagConverter;
 import Utils.Util;
@@ -22,7 +24,6 @@ public class Document {
 	private int mRating = -1;
 	private long mTime = -1;
 	private int[][] sentences;
-	private byte[][] postag;
 	private int mLevel; // lv1, 2 or 3 of cleaned text
 	private boolean isEnglish = false;
 
@@ -137,7 +138,6 @@ public class Document {
 		for (int i = 0; i < normalizedSentences.size(); i++) {
 			List<Integer> wordIDList = new ArrayList<>();
 			List<String> wordList = normalizedSentences.get(i);
-
 			for (String normalizedWord : wordList) {
 				String[] pair = normalizedWord.split("_");
 				if (pair.length == 0)
@@ -170,6 +170,22 @@ public class Document {
 		return true;
 	}
 
+	/**
+	 * Similar to preprocess, but instead of preprocessing data, this function
+	 *  just read whatever were processed in database out to populate the document
+	 * 
+	 * @param fullSentence
+	 *            - The sentence to extract words from
+	 * @return TRUE if it successfully extracted some words, FALSE otherwise
+	 * @throws Exception
+	 */
+	public void populatePreprocessedDataFromDB(int level) throws Exception {
+		DocumentDatasetDB db = DocumentDatasetDB.getInstance();
+		sentences = db.queryPreprocessedData(mID, level);
+		if (sentences == null)
+			throw new Exception("Can't find the processed data for this document id = " +mID + " at level = "+ level);
+	}
+
 	public String readRawTextFromDirectory(String directory)
 			throws FileNotFoundException {
 		Scanner rawtextFile = new Scanner(
@@ -197,7 +213,7 @@ public class Document {
 		for (int[] sentence : sentences) {
 			for (int wordID : sentence) {
 				DBWord w;
-				w = voc.getWord(wordID);
+				w = voc.getWordFromDB(wordID);
 				if (w != null) {
 					strBld.append(prefix);
 					if (withPOS)
@@ -222,7 +238,7 @@ public class Document {
 		for (int[] sentence : sentences) {
 			for (int wordID : sentence) {
 				DBWord w;
-				w = voc.getWord(wordID);
+				w = voc.getWordFromDB(wordID);
 				if (w != null) {
 					strBld.append(prefix);
 					strBld.append(

@@ -138,7 +138,35 @@ public class DocumentDatasetDB {
 		}
 		return null;
 	}
+	public int[][] queryPreprocessedData(int documentID, int level)
+			throws Exception {
+		String fields[] = {  "spelling_correction_LV1", "rootword_stemming_LV2",
+				"over_stemming_LV3", "rootword_stemming_lite_LV4" };
+		String condition = "rawdataID='" + documentID + "'";
+		// condition = // "count>1000";
 
+		ResultSet results;
+		results = dbconnector.select(CLEANEDTEXT_TABLE, fields, condition);
+		while (results.next()) {
+			int[][]sens = null;
+			switch (level) {
+
+			case LV1_SPELLING_CORRECTION:
+				sens = text2Int2D(results.getString("spelling_correction_LV1"));
+				break;
+			case LV2_ROOTWORD_STEMMING:
+				sens = text2Int2D(results.getString("rootword_stemming_LV2"));
+				break;
+			case LV3_OVER_STEMMING:
+				sens = text2Int2D(results.getString("over_stemming_LV3"));
+				break;
+			case LV4_ROOTWORD_STEMMING_LITE:
+				sens = text2Int2D(results.getString("rootword_stemming_lite_LV4"));
+			}
+			return sens;
+		}
+		return null;
+	}
 	public boolean isDatasetIDexist(String datasetID) throws SQLException {
 		String fields[] = { "ID" };
 		String condition = "ID='" + datasetID + "'";

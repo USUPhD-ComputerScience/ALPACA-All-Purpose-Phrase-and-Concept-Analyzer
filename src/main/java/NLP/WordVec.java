@@ -17,7 +17,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
-
 import java.util.Scanner;
 import java.util.Set;
 
@@ -29,31 +28,57 @@ public class WordVec {
 	private final Map<String, float[]> wordVector;
 	private static Map<String, float[]> phraseVector = new HashMap<>();
 	public static final int VECTOR_SIZE = 200;
-	public static final String VECTOR_FILE = "lib/dictionary/word2vecTrainingData/bugVectors.txt";
+	public static final String VECTOR_FILE = "D:/projects/ALPACA/NSF/vectors.txt";
 
 	public static void main(String[] args) throws IOException {
 		// normalizeWord2vec();
-		reformClusterELKI();
+		// reformClusterELKI();
 		// DBScanCluster();
-		//filterForELKIDensityClustering();
+		// filterForELKIDensityClustering();
+		collectData("D:\\projects\\ALPACA\\NSF\\preprocessed_LV2\\");
 	}
+
+	private static void collectData(String directory) throws IOException {
+
+		List<String> fileLists = Util.listFilesForFolder(directory);
+		Scanner br = null;
+		PrintWriter pw = new PrintWriter(
+				new FileWriter(directory + "corpusTrainingData.txt"));
+		for (String fileName : fileLists) {
+			try {
+				br = new Scanner(new FileReader(fileName));
+				String line = br.nextLine();
+				pw.println(line);
+			} catch (FileNotFoundException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} finally {
+				if (br != null)
+					br.close();
+			}
+
+		}
+		pw.close();
+	}
+
 	public double cosineSimilarityForVectors(float[] vector1, float[] vector2,
-            boolean normalize) {
-        double sim = 0, square1 = 0, square2 = 0;
-        if (vector1 == null || vector2 == null) {
-            return 0;
-        }
-        for (int i = 0; i < vector1.length; i++) {
-            square1 += vector1[i] * vector1[i];
-            square2 += vector2[i] * vector2[i];
-            sim += vector1[i] * vector2[i];
-        }
-        if (!normalize) {
-            return sim / Math.sqrt(square1) / Math.sqrt(square2);
-        } else {
-            return (1 + sim / Math.sqrt(square1) / Math.sqrt(square2)) / 2;
-        }
-    }
+			boolean normalize) {
+		double sim = 0, square1 = 0, square2 = 0;
+		if (vector1 == null || vector2 == null) {
+			return 0;
+		}
+		for (int i = 0; i < vector1.length; i++) {
+			square1 += vector1[i] * vector1[i];
+			square2 += vector2[i] * vector2[i];
+			sim += vector1[i] * vector2[i];
+		}
+		if (!normalize) {
+			return sim / Math.sqrt(square1) / Math.sqrt(square2);
+		} else {
+			return (1 + sim / Math.sqrt(square1) / Math.sqrt(square2)) / 2;
+		}
+	}
+
 	private static void reformClusterELKI() throws IOException {
 		String directory = "D:\\EclipseWorkspace\\MARK\\lib\\dictionary\\word2vecTrainingData\\clusterDensity\\";
 		File fcheckExist = new File(directory);
@@ -105,7 +130,8 @@ public class WordVec {
 		Scanner br = null;
 		PrintWriter pw = null;
 		TextNormalizer normalizer = TextNormalizer.getInstance();
-		normalizer.readConfigINI("D:\\EclipseWorkspace\\TextNormalizer\\config.INI");
+		normalizer.readConfigINI(
+				"D:\\EclipseWorkspace\\TextNormalizer\\config.INI");
 		Set<String> stopWords = NLP.NatureLanguageProcessor.getInstance()
 				.getStopWordSet();
 		try {

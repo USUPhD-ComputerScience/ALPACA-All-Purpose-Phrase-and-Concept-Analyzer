@@ -67,7 +67,7 @@ public class Util {
 		return sb.toString();
 	}
 
-	static public double log(int x, int base) {
+	static public double log(double x, int base) {
 		return (Math.log(x) / Math.log(base));
 	}
 
