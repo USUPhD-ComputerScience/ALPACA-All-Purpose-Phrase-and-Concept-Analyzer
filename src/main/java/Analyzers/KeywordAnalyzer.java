@@ -22,7 +22,9 @@ import com.opencsv.CSVWriter;
 
 import Datastores.Dataset;
 import Datastores.Document;
-import Datastores.DocumentDatasetDB;
+import Datastores.FileDataAdapter;
+import MainTasks.Alpaca;
+import MainTasks.PreprocesorMain;
 import NLP.NatureLanguageProcessor;
 import Utils.Util;
 import Vocabulary.Vocabulary;
@@ -30,9 +32,10 @@ import Vocabulary.Vocabulary;
 public class KeywordAnalyzer {
 	public static void main(String[] args) throws Exception {
 		KeywordAnalyzer analyzer = new KeywordAnalyzer();
-		analyzer.calculateAndWriteKeywordScore(1,
-				DocumentDatasetDB.LV2_ROOTWORD_STEMMING,
-				"D:\\projects\\ALPACA\\NSF\\wordScore\\scoreLV2.csv", 1000);
+		Dataset data = Alpaca.readProcessedData("D:/projects/ALPACA/NSF/",
+				PreprocesorMain.LV2_ROOTWORD_STEMMING);
+		analyzer.calculateAndWriteKeywordScore(data,
+				PreprocesorMain.LV2_ROOTWORD_STEMMING, 1000, false);
 	}
 
 	public static final int TFIDF = 3; // tf * log(1/N+1)
@@ -44,8 +47,19 @@ public class KeywordAnalyzer {
 												// MARK, this is just for app
 												// reviews
 
-	public void calculateAndWriteKeywordScore(int datasetID, int level,
-			String outputFilename, int numberOfPieces) throws Exception {
+	public void calculateAndWriteKeywordScore(Dataset dataset, int level,
+			int numberOfPieces, boolean isContrast) throws Exception {
+
+		String outputFilename = FileDataAdapter.getLevelLocationDir(
+				"wordScore/", dataset.getDirectory(), level);
+		File fDirectory = new File(outputFilename);
+		if (!fDirectory.exists()) {
+			fDirectory.mkdirs();
+			// If you require it to make the entire directory path including
+			// parents,
+			// use directory.mkdirs(); here instead.
+		}
+		outputFilename += "score.csv";
 		Map<Integer, Integer> termCount = new HashMap<>(); // total time a term
 															// appeared
 		Map<Integer, Integer> documentCount = new HashMap<>(); // count the
@@ -58,23 +72,27 @@ public class KeywordAnalyzer {
 																// term
 		Map<Integer, Double> frequencyPercentile = new HashMap<>();
 		Map<Integer, int[]> data4ContrastScore = null;
-		if (level == CONTRAST_SCORE)
+		if (isContrast)
 			data4ContrastScore = new HashMap<>();
 		// List<Application> appList = appMan.getAppList();
-		DocumentDatasetDB db = DocumentDatasetDB.getInstance();
-		Dataset dataset = db.queryDatasetInfo(datasetID);
-		db.queryRawTextForSingleDataset(dataset);
 		// counting statistic
+		int count = 0;
 		for (Document doc : dataset.getDocumentSet()) {
+			doc.populatePreprocessedDataFromDB(level, dataset);
 			if (!doc.isEnglish())
 				continue;
 			// int docID = doc.getDocumentID();
-			doc.populatePreprocessedDataFromDB(level);
 			int[][] sentences = doc.getSentences();
 			int rating = doc.getRating();
 			countWord(termTotalScore, rating, termCount, documentCount,
 					sentences, data4ContrastScore);
+			count++;
+			if (count % 1000 == 0) {
+				System.out.println("processed " + count + " documents");
+			}
 		}
+		System.out.println("processed " + count + " documents");
+		System.out.println("Writing to file");
 		// computing and printing to file
 		Set<String> stopwords = NatureLanguageProcessor.getInstance()
 				.getStopWordSet();
@@ -82,13 +100,13 @@ public class KeywordAnalyzer {
 				numberOfPieces);
 		PrintWriter outputFile = new PrintWriter(new File(outputFilename));
 		int totalNumberOfDoc = dataset.getDocumentSet().size();
-		Vocabulary voc = Vocabulary.getInstance();
+		Vocabulary voc = dataset.getVocabulary();
 		outputFile.println(
 				"\"term\",\"frequency\",\"mean score\",\"idf\",\"weibull(freq)\",\"contrast\"");
 		for (Entry<Integer, Integer> totalScoreEntry : termTotalScore
 				.entrySet()) {
 			int term = totalScoreEntry.getKey();
-			String word = voc.getText(term);
+			String word = voc.getWordFromDB(term).getText();
 			if (Util.isNumeric(word))
 				continue;
 			if (stopwords.contains(word))
@@ -97,15 +115,15 @@ public class KeywordAnalyzer {
 			Integer docFreq = documentCount.get(term);
 			Integer totalScore = totalScoreEntry.getValue();
 			double idf = Util.log(totalNumberOfDoc, 10) - Util.log(docFreq, 10);
-			if (level == CONTRAST_SCORE) {
+			if (isContrast) {
 				int[] ratingCounts = data4ContrastScore.get(term);
 				outputFile.println("\"" + word + "\"," + "\"" + freq + "\","
 						+ "\"" + (double) totalScore / docFreq + "\"," + "\""
 						+ idf + "\"," + "\"" + frequencyPercentile.get(term)
-						+ "\","
+						+ "\",\""
 						+ contrast(ratingCounts[0], ratingCounts[1],
 								ratingCounts[2], ratingCounts[3],
-								ratingCounts[4], true)
+								ratingCounts[4], true)[1]
 						+ "\"");
 			} else {
 				outputFile.println("\"" + word + "\"," + "\"" + freq + "\","
@@ -115,6 +133,7 @@ public class KeywordAnalyzer {
 			}
 		}
 		outputFile.close();
+		System.out.println("done writing, exiting program.");
 	}
 
 	private static double[] contrast(int x1, int x2, int x3, int x4, int x5,
@@ -182,16 +201,16 @@ public class KeywordAnalyzer {
 				terms.add(sentences[s][w]);
 				// only for 5 rating scheme
 				if (fiveRatingWordCount != null) {
-					if (score >= 5 || score < 0)
+					if (score > 5 || score <= 0)
 						throw new Exception(
 								"not a 5 ratings scheme, value = " + score);
 					int[] ratingCount = fiveRatingWordCount
 							.get(sentences[s][w]);
 					if (ratingCount == null) {
 						ratingCount = new int[5];
-						ratingCount[score] = 1;
+						ratingCount[score - 1] = 1;
 					} else {
-						ratingCount[score] += 1;
+						ratingCount[score - 1] += 1;
 					}
 					fiveRatingWordCount.put(sentences[s][w], ratingCount);
 				}

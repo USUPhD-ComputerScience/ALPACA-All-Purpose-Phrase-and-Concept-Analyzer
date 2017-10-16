@@ -26,7 +26,7 @@ public class ClusterAnalyzer {
 	private static Map<String, Double> wordScore = null;
 	public static final int AVERAGE_JACCARD = 1;
 	public static final int AVERAGE_WORD = 2;
-	private static final String SCORING_FILENAME = "D:\\projects\\ALPACA\\NSF\\wordScore\\scoreLV2.csv";
+	private static final String SCORING_FILENAME = "D:\\projects\\ALPACA\\OLDREVIEWS\\com.facebook.orca\\wordScore\\scoreLV2.csv";
 
 	public static void readWordsSkewness(int typeOfScore, String fileName)
 			throws Throwable {
@@ -49,15 +49,19 @@ public class ClusterAnalyzer {
 		// clusterPhrases("D:/projects/ALPACA/NSF/concepts/seeds_beta.csv",
 		// "D:/projects/ALPACA/NSF/clusters/seeds_beta.csv",
 		// "D:/projects/ALPACA/NSF/vectors.txt", AVERAGE_JACCARD, 0.3);
-		clusterWords("D:/projects/ALPACA/NSF/clusters/seeds_beta.csv",
-				"D:/projects/ALPACA/NSF/vectors.txt", AVERAGE_JACCARD);
+		clusterWords(
+				"D:/projects/ALPACA/OLDREVIEWS/com.facebook.orca/clusters/seeds_beta.csv",
+				"D:/projects/ALPACA/OLDREVIEWS/ReviewVectors.txt",
+				AVERAGE_JACCARD, SCORING_FILENAME,
+				KeywordAnalyzer.CONTRAST_SCORE, 1000);
 	}
 
 	public static void clusterWords(String outputFile, String vectorFile,
-			int typeOfSimMetric) throws Throwable {
+			int typeOfSimMetric, String scoreFile, int typeOfScore, int topNumber)
+			throws Throwable {
 		WordVec word2vec = new WordVec(vectorFile);
 		System.out.println("> Reading words from file");
-		readWordsSkewness(KeywordAnalyzer.WEIBULL_FREQUENCY, SCORING_FILENAME);
+		readWordsSkewness(typeOfScore, scoreFile);
 		ArrayList<Item> words = loadWordsIntoItemList(wordScore, word2vec);
 		cluster(new File(outputFile), words, typeOfSimMetric, word2vec);
 		System.out.println("> Done!");
@@ -93,9 +97,9 @@ public class ClusterAnalyzer {
 			pw.print(mainTopic.item.toString() + ",");
 			for (ItemWithSim item : cluster) {
 				ItemWithSim word = (ItemWithSim) item;
-				pw.print("<" + word.item.toString() + "_" + word.sim + "> ");
+				pw.print(word.item.toString() + ",");
 			}
-			pw.print("," + mainTopic.score);
+			pw.print(mainTopic.score);
 			pw.println();
 		}
 

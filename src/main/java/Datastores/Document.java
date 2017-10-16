@@ -2,6 +2,8 @@ package Datastores;
 
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.sql.SQLException;
 import java.text.ParseException;
 import java.util.ArrayList;
@@ -17,8 +19,6 @@ import Vocabulary.DBWord;
 import Vocabulary.Vocabulary;
 
 public class Document {
-	private int mID = -1;
-	private int mDatasetID = -1;
 	private String mRawText_fileName = null;
 	private String mAuthor_fileName = null;
 	private int mRating = -1;
@@ -35,21 +35,20 @@ public class Document {
 		mLevel = level;
 	}
 
-	public Document(int id, String raw_text, int rating, long time,
-			boolean english, int datasetID, String author_fn) throws Exception {
+	public Document(String raw_text, int rating, long time, boolean english,
+			String author_fn) throws Exception {
 		// TODO Auto-generated constructor stub
-		mID = id;
 		mRawText_fileName = raw_text;
-		if (raw_text == null)
-			throw new Exception("Exception on document ID<" + id
-					+ ">: raw_text is null, which is not allowed!");
 		mAuthor_fileName = author_fn;
 		mRating = rating;
 		mTime = time;
 		isEnglish = english;
-		mDatasetID = datasetID;
 	}
 
+	public String getAuthorFileName(){
+		return mAuthor_fileName;
+	}
+	
 	@Override
 	public boolean equals(Object obj) {
 		// TODO Auto-generated method stub
@@ -60,7 +59,7 @@ public class Document {
 		if (!(obj instanceof Document))
 			return false;
 		Document docFromObj = (Document) obj;
-		if (mID == docFromObj.mID)
+		if (mRawText_fileName.equals(docFromObj.mRawText_fileName))
 			return true;
 		else
 			return false;
@@ -72,9 +71,6 @@ public class Document {
 		return mRawText_fileName.hashCode();
 	}
 
-	public int getDocumentID() {
-		return mID;
-	}
 
 	public String getRawTextFileName() {
 		// TODO Auto-generated method stub
@@ -116,11 +112,9 @@ public class Document {
 	 * @return TRUE if it successfully extracted some words, FALSE otherwise
 	 * @throws Exception
 	 */
-	public boolean preprocess(int level, String directory) throws Exception {
+	public boolean preprocess(int level, String directory, Vocabulary voc) throws Exception {
 		TextNormalizer normalizer = TextNormalizer.getInstance();
-		Vocabulary voc = Vocabulary.getInstance();
 		POSTagConverter posconverter = POSTagConverter.getInstance();
-		DocumentDatasetDB db = DocumentDatasetDB.getInstance();
 		// NatureLanguageProcessor nlp = NatureLanguageProcessor.getInstance();
 		// String[] rawSentences = nlp.extractSentence(rawText);
 		String rawtext = readRawTextFromDirectory(directory);
@@ -144,8 +138,7 @@ public class Document {
 					continue;
 				if (pair[0].length() == 0 || pair[1].length() == 0)
 					continue;
-				int wordid = voc.addWord(pair[0], posconverter.getCode(pair[1]),
-						mDatasetID, level);
+				int wordid = voc.addWord(pair[0], posconverter.getCode(pair[1]));
 				wordIDList.add(wordid);
 				countWord++;
 			}
@@ -166,24 +159,21 @@ public class Document {
 			return false;
 		}
 		isEnglish = true;
-		db.updateEnglishStatus(mID);
 		return true;
 	}
 
 	/**
 	 * Similar to preprocess, but instead of preprocessing data, this function
-	 *  just read whatever were processed in database out to populate the document
+	 * just read whatever were processed in database out to populate the
+	 * document
 	 * 
 	 * @param fullSentence
 	 *            - The sentence to extract words from
 	 * @return TRUE if it successfully extracted some words, FALSE otherwise
 	 * @throws Exception
 	 */
-	public void populatePreprocessedDataFromDB(int level) throws Exception {
-		DocumentDatasetDB db = DocumentDatasetDB.getInstance();
-		sentences = db.queryPreprocessedData(mID, level);
-		if (sentences == null)
-			throw new Exception("Can't find the processed data for this document id = " +mID + " at level = "+ level);
+	public void populatePreprocessedDataFromDB(int level, Dataset dataset) throws Exception {
+		FileDataAdapter.getInstance().readCleansedText(this, dataset, level);
 	}
 
 	public String readRawTextFromDirectory(String directory)
@@ -202,12 +192,11 @@ public class Document {
 		return strbd.toString();
 	}
 
-	public String toString(boolean withPOS)
-			throws ClassNotFoundException, SQLException {
+	public String toString(boolean withPOS, Vocabulary voc)
+			throws ClassNotFoundException, SQLException, UnsupportedEncodingException, IOException {
 		if (sentences == null)
 			return "";
 
-		Vocabulary voc = Vocabulary.getInstance();
 		StringBuilder strBld = new StringBuilder();
 		String prefix = "";
 		for (int[] sentence : sentences) {
@@ -228,11 +217,10 @@ public class Document {
 		return strBld.toString();
 	}
 
-	public String toPOSString() throws ClassNotFoundException, SQLException {
+	public String toPOSString(Vocabulary voc) throws ClassNotFoundException, SQLException, UnsupportedEncodingException, IOException {
 		if (sentences == null)
 			return "";
 
-		Vocabulary voc = Vocabulary.getInstance();
 		StringBuilder strBld = new StringBuilder();
 		String prefix = "";
 		for (int[] sentence : sentences) {

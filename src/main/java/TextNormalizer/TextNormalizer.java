@@ -14,7 +14,7 @@ import javax.print.Doc;
 
 import org.tartarus.snowball.SnowballStemmer;
 
-import Datastores.DocumentDatasetDB;
+import MainTasks.PreprocesorMain;
 import NLP.CustomStemmer;
 import NLP.NatureLanguageProcessor;
 import NLP.SymSpell;
@@ -222,18 +222,18 @@ public class TextNormalizer {
 						senOI = sentence;
 					}
 					switch (level) {
-					case DocumentDatasetDB.LV1_SPELLING_CORRECTION:
+					case PreprocesorMain.LV1_SPELLING_CORRECTION:
 						break;
-					case DocumentDatasetDB.LV2_ROOTWORD_STEMMING:
+					case PreprocesorMain.LV2_ROOTWORD_STEMMING:
 						pair = customStemmer.stem(pair,false);
 						break;
-					case DocumentDatasetDB.LV3_OVER_STEMMING:
+					case PreprocesorMain.LV3_OVER_STEMMING:
 						// porter stemmer
 						stemmer.setCurrent(pair[0]);
 						stemmer.stem();
 						pair[0] = stemmer.getCurrent();
 						break;
-					case DocumentDatasetDB.LV4_ROOTWORD_STEMMING_LITE:
+					case PreprocesorMain.LV4_ROOTWORD_STEMMING_LITE:
 						pair = customStemmer.stem(pair,true);
 						break;
 					}
@@ -314,7 +314,7 @@ public class TextNormalizer {
 		TextNormalizer normalizer = TextNormalizer.getInstance();
 		List<List<String>> processedTaggedSentences = normalizer
 				.normalize_SplitSentence(rawText,
-						DocumentDatasetDB.LV1_SPELLING_CORRECTION);
+						PreprocesorMain.LV1_SPELLING_CORRECTION);
 		if (processedTaggedSentences == null)
 			return null;
 		byte[][] POSTag = new byte[processedTaggedSentences.size()][];
@@ -371,7 +371,7 @@ public class TextNormalizer {
 									+ "love angry birds.And you should sign with sponge bob squarepants for"
 									+ " an app .And you should youse Billy Joel music for your background"
 									+ " sound. He is running",
-							DocumentDatasetDB.LV4_ROOTWORD_STEMMING_LITE);
+									PreprocesorMain.LV4_ROOTWORD_STEMMING_LITE);
 			for(List<String> sentence : results){
 				for(String word : sentence){
 					System.out.print(word + " ");

@@ -15,79 +15,80 @@ import com.opencsv.CSVWriter;
 
 import Datastores.Dataset;
 import Datastores.Document;
-import Datastores.DocumentDatasetDB;
+import Datastores.FileDataAdapter;
 import TextNormalizer.TextNormalizer;
 import Utils.Util;
 import Vocabulary.Vocabulary;
 
 public class PreprocesorMain {
 
+	public static final int LV1_SPELLING_CORRECTION = 1;
+	public static final int LV2_ROOTWORD_STEMMING = 2;
+	public static final int LV3_OVER_STEMMING = 3;
+	public static final int LV4_ROOTWORD_STEMMING_LITE = 4;
 	public static void main(String[] args) throws Throwable {
 		// TODO Auto-generated method stub
 		// processData(1);
 		TextNormalizer normalizer = TextNormalizer.getInstance();
 		normalizer.readConfigINI(
 				"D:\\EclipseWorkspace\\TextNormalizer\\config.INI");
-		int datasetID = readRawDataToDB(
-				"D:\\projects\\ALPACA\\NSF\\metadata.csv");
-		processDBData(datasetID, DocumentDatasetDB.LV2_ROOTWORD_STEMMING,
-				"D:\\projects\\ALPACA\\NSF\\", "D:\\projects\\ALPACA\\NSF\\");
+
+		processDBData("D:/projects/ALPACA/NSF/",
+				PreprocesorMain.LV2_ROOTWORD_STEMMING);
 	}
 
-	public static void processDBData(int datasetID, int level,
-			String outputDirectory, String inputDirectory) throws Exception {
-
+	public static void processDBData(String directory, int level)
+			throws Exception {
+		Dataset data = readRawData(directory,
+				PreprocesorMain.LV2_ROOTWORD_STEMMING);
 		long start = System.currentTimeMillis();
 		int count = 0;
 		int englishCount = 0;
-		DocumentDatasetDB db = DocumentDatasetDB.getInstance();
 		// read documents for this dataset
 		System.out.println(">> Querying raw documents...");
-		Dataset dataset = db.queryDatasetInfo(datasetID);
-		db.queryRawTextForSingleDataset(dataset); // too much memory used
-		for (Document doc : dataset.getDocumentSet()) {
+		Vocabulary voc = data.getVocabulary();
+		for (Document doc : data.getDocumentSet()) {
 			doc.setLevel(level);
 			// preprocessing part
-			boolean isEnglish = doc.preprocess(level, inputDirectory);
-			db.updateCleansedText(doc);
-
+			boolean isEnglish = doc.preprocess(level, directory, voc);
 			count++;
 			if (isEnglish) {
 				englishCount++;
 				PrintWriter csvwrt = new PrintWriter(
-						new FileWriter(outputDirectory + "preprocessed_LV"+level+"//"
-								+ doc.getRawTextFileName()));
-				csvwrt.println(doc.toString(false));
-				csvwrt.println(doc.toPOSString());
+						new FileWriter(directory + "preprocessed_LV" + level
+								+ "//" + doc.getRawTextFileName()));
+				csvwrt.println(doc.toString(false, voc));
+				csvwrt.println(doc.toPOSString(voc));
 				csvwrt.close();
 				if (count % 100 == 0)
 					System.out.println(">> processed " + count + " documents ("
-							+ englishCount + "/" + englishCount + " is English)");
+							+ englishCount + "/" + englishCount
+							+ " is English)");
 			}
 
 		}
 
 		System.out.println(">> processed " + count + " documents ("
 				+ englishCount + "/" + count + " is English)");
-		// db.preprocessRawTextForSingleDataset(dataset, level, csvwrt,
-		// withPOS);
-		Vocabulary.getInstance().updateCountToDB(level);
+		System.out.println("Writing data to database..");
+		FileDataAdapter.getInstance().writeCleansedText(data, level);
+		voc.writeToDB();
 		System.out.println(" Done! Preprocessing took "
 				+ (double) (System.currentTimeMillis() - start) / 1000 / 60
 				+ "minutes");
 	}
 
-	public static int readRawDataToDB(String metaDataFileName)
-			throws IOException, ClassNotFoundException, SQLException {
+	public static Dataset readRawData(String directory, int level)
+			throws Exception {
+		String metaDataFileName = directory + "metadata.csv";
+		Dataset dataset = null;
 		File fcheckExist = new File(metaDataFileName);
 		if (!fcheckExist.exists()) {
 			throw new FileNotFoundException(
 					"This file can't be found: " + metaDataFileName);
 		}
-		DocumentDatasetDB db = DocumentDatasetDB.getInstance();
 		CSVReader reader = null;
 		int count = 0;
-		int datasetID = -1;
 		try {
 			reader = new CSVReader(new FileReader(metaDataFileName), ',',
 					CSVWriter.DEFAULT_ESCAPE_CHARACTER);
@@ -102,9 +103,8 @@ public class PreprocesorMain {
 				boolean has_author = Boolean.parseBoolean(line[4]);
 				String otherMetadata = line[5];
 				// add to database, get id back
-				datasetID = db.addNewDataset(name, description, has_rating,
-						has_time, has_author, otherMetadata);
-
+				dataset = new Dataset(name, description, has_time, has_rating,
+						has_author, otherMetadata, directory, level);
 				while ((line = reader.readNext()) != null) {
 					String rawtext_fileName = line[0];
 					int rating = -1;
@@ -116,9 +116,13 @@ public class PreprocesorMain {
 					String author = null;
 					if (has_author)
 						author = line[3];
-					// add to database
-					db.insertRawData(rawtext_fileName, rating, time, author,
-							datasetID);
+					if (rawtext_fileName == null)
+						throw new Exception("Line " + count
+								+ ": no raw text data file, aborting");
+					// add to dataset
+					Document doc = new Document(rawtext_fileName, rating, time,
+							false, author);
+					dataset.addDocument(doc);
 					count++;
 					if (count % 100 == 0)
 						System.out.println("read in " + count + " documents");
@@ -134,7 +138,7 @@ public class PreprocesorMain {
 			if (reader != null)
 				reader.close();
 		}
-		return datasetID;
+		return dataset;
 	}
 
 }

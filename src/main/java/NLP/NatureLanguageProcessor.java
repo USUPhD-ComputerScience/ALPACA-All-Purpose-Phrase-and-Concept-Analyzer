@@ -284,7 +284,7 @@ public class NatureLanguageProcessor {
 		for (int i = 0; i < input.length(); i++) {
 			final char c = input.charAt(i);
 			if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
-					|| (c >= '0' && c <= '9') ) {
+					|| (c >= '0' && c <= '9') || (c == '_') ) {
 				if (sb == null)
 					sb = new StringBuilder();
 				sb.append(c);
