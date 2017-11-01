@@ -79,25 +79,25 @@ public class TextNormalizer {
 	}
 
 	// will return null if the text is not english
-//	public String normalize(String input) {
-//		String[] taggedTokens = preprocessAndSplitToTaggedTokens(input);
-//		if (taggedTokens == null)
-//			return null;
-//		List<String> correctedTaggedTokens = new ArrayList<>();
-//		CustomStemmer stemmer = CustomStemmer.getInstance();
-//		for (String taggedTok : taggedTokens) {
-//			String[] pair = taggedTok.split("_");
-//			pair[0] = pair[0].toLowerCase();
-//			pair = stemmer.stem(pair,false);
-//			correctedTaggedTokens.add(pair[0] + "_" + pair[1]);
-//		}
-//		String correctedTaggedText = NatureLanguageProcessor
-//				.mergeIntoText(correctedTaggedTokens);
-//		if (correctedTaggedText == null)
-//			return null;
-//		debug_println(correctedTaggedText);
-//		return correctedTaggedText;
-//	}
+	// public String normalize(String input) {
+	// String[] taggedTokens = preprocessAndSplitToTaggedTokens(input);
+	// if (taggedTokens == null)
+	// return null;
+	// List<String> correctedTaggedTokens = new ArrayList<>();
+	// CustomStemmer stemmer = CustomStemmer.getInstance();
+	// for (String taggedTok : taggedTokens) {
+	// String[] pair = taggedTok.split("_");
+	// pair[0] = pair[0].toLowerCase();
+	// pair = stemmer.stem(pair,false);
+	// correctedTaggedTokens.add(pair[0] + "_" + pair[1]);
+	// }
+	// String correctedTaggedText = NatureLanguageProcessor
+	// .mergeIntoText(correctedTaggedTokens);
+	// if (correctedTaggedText == null)
+	// return null;
+	// debug_println(correctedTaggedText);
+	// return correctedTaggedText;
+	// }
 
 	// check for non-english text using the method proposed in our publication
 	// biproportionThreshold: ratio of pair of english words to all words,
@@ -157,8 +157,8 @@ public class TextNormalizer {
 	// 3. angry_JJ bird_VB i_PRP love_VB the_NN new_JJ level_NN they_PRP be_VB
 	// very_NN challenging_JJ
 	// will return null if the text is not english
-	public List<List<String>> normalize_SplitSentence(String input, int level)
-			throws Exception {
+	public List<List<String>> normalize_SplitSentence(String input, int level,
+			boolean needPOS) throws Exception {
 		if (level < 0 && level > 3)
 			throw new Exception(
 					"Level is not right, not expecting level = " + level);
@@ -225,7 +225,7 @@ public class TextNormalizer {
 					case PreprocesorMain.LV1_SPELLING_CORRECTION:
 						break;
 					case PreprocesorMain.LV2_ROOTWORD_STEMMING:
-						pair = customStemmer.stem(pair,false);
+						pair = customStemmer.stem(pair, false);
 						break;
 					case PreprocesorMain.LV3_OVER_STEMMING:
 						// porter stemmer
@@ -234,12 +234,14 @@ public class TextNormalizer {
 						pair[0] = stemmer.getCurrent();
 						break;
 					case PreprocesorMain.LV4_ROOTWORD_STEMMING_LITE:
-						pair = customStemmer.stem(pair,true);
+						pair = customStemmer.stem(pair, true);
 						break;
 					}
-
-					String taggedWord = pair[0] + "_" + pair[1];
-					senOI.add(taggedWord);
+					if (needPOS) {
+						String taggedWord = pair[0] + "_" + pair[1];
+						senOI.add(taggedWord);
+					} else
+						senOI.add(pair[0]);
 				}
 
 			}
@@ -314,7 +316,7 @@ public class TextNormalizer {
 		TextNormalizer normalizer = TextNormalizer.getInstance();
 		List<List<String>> processedTaggedSentences = normalizer
 				.normalize_SplitSentence(rawText,
-						PreprocesorMain.LV1_SPELLING_CORRECTION);
+						PreprocesorMain.LV1_SPELLING_CORRECTION, true);
 		if (processedTaggedSentences == null)
 			return null;
 		byte[][] POSTag = new byte[processedTaggedSentences.size()][];
@@ -364,16 +366,15 @@ public class TextNormalizer {
 		normalizer.readConfigINI(
 				"D:\\EclipseWorkspace\\TextNormalizer\\config.INI");
 		try {
-			List<List<String>> results = normalizer
-					.normalize_SplitSentence(
-							"Angry birds I am loving the new levels they (the new level. I meant the"
-									+ " new levels that is going well) are very challenging . You should make more levels . (random things) I"
-									+ "love angry birds.And you should sign with sponge bob squarepants for"
-									+ " an app .And you should youse Billy Joel music for your background"
-									+ " sound. He is running",
-									PreprocesorMain.LV4_ROOTWORD_STEMMING_LITE);
-			for(List<String> sentence : results){
-				for(String word : sentence){
+			List<List<String>> results = normalizer.normalize_SplitSentence(
+					"Angry birds I am loving the new levels they (the new level. I meant the"
+							+ " new levels that is going well) are very challenging . You should make more levels . (random things) I"
+							+ "love angry birds.And you should sign with sponge bob squarepants for"
+							+ " an app .And you should youse Billy Joel music for your background"
+							+ " sound. He is running",
+					PreprocesorMain.LV4_ROOTWORD_STEMMING_LITE, true);
+			for (List<String> sentence : results) {
+				for (String word : sentence) {
 					System.out.print(word + " ");
 				}
 				System.out.println();

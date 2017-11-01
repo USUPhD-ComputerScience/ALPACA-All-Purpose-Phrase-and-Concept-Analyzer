@@ -79,6 +79,12 @@ public class prepareCVEDataset {
 				sname = attributes.getValue("name");
 				tempItem = new Item();
 				tempItem.name = sname;
+				try {
+					tempItem.time = parseDate(sdate).getTime();
+				} catch (ParseException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
 			}
 			if (qName.equalsIgnoreCase("status")) {
 				bstatus = true;

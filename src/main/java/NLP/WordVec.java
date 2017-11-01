@@ -300,25 +300,13 @@ public class WordVec {
 		Scanner br = null;
 		try {
 			br = new Scanner(new FileReader(filename));
-			int vocabSize = br.nextInt();
-			int layer1Size = br.nextInt();
-			for (int a = 0; a < vocabSize; a++) {
+			while(br.hasNext()){
 				String word = br.next();
-				float[] vector = new float[layer1Size];
-				for (int b = 0; b < layer1Size; b++) {
+				float[] vector = new float[VECTOR_SIZE];
+				for (int b = 0; b < VECTOR_SIZE; b++) {
 					vector[b] = br.nextFloat();
 				}
 				wordVector.put(word, vector);
-				// if ((a + 1) % (vocabSize / 100) == 0) {
-				// System.out.println("progress " + (a + 1) * 100 / vocabSize
-				// + "%");
-				//
-				// System.out.print(word);
-				// for (int b = 0; b < layer1Size; b++) {
-				// System.out.print(" " + vector[b]);
-				// }
-				// System.out.println();
-				// }
 			}
 
 		} finally {

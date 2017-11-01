@@ -78,7 +78,7 @@ public class KeywordAnalyzer {
 		// counting statistic
 		int count = 0;
 		for (Document doc : dataset.getDocumentSet()) {
-			doc.populatePreprocessedDataFromDB(level, dataset);
+			//doc.populatePreprocessedDataFromDB(level, dataset);
 			if (!doc.isEnglish())
 				continue;
 			// int docID = doc.getDocumentID();
@@ -92,7 +92,6 @@ public class KeywordAnalyzer {
 			}
 		}
 		System.out.println("processed " + count + " documents");
-		System.out.println("Writing to file");
 		// computing and printing to file
 		Set<String> stopwords = NatureLanguageProcessor.getInstance()
 				.getStopWordSet();
@@ -129,11 +128,12 @@ public class KeywordAnalyzer {
 				outputFile.println("\"" + word + "\"," + "\"" + freq + "\","
 						+ "\"" + (double) totalScore / docFreq + "\"," + "\""
 						+ idf + "\"," + "\"" + frequencyPercentile.get(term)
-						+ "\"," + "null" + "\"");
+						+ "\",\"" + "null" + "\"");
 			}
 		}
 		outputFile.close();
-		System.out.println("done writing, exiting program.");
+		System.out.println("Done writing to file: " + outputFilename);
+		//System.out.println("done writing, exiting program.");
 	}
 
 	private static double[] contrast(int x1, int x2, int x3, int x4, int x5,

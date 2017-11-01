@@ -19,6 +19,7 @@ import Utils.POSTagConverter;
 public class Vocabulary {
 	private Map<DBWord, Integer> VocSearchForID = new HashMap<>();
 	private List<DBWord> VocList = new ArrayList<>();
+	private Map<String, List<Integer>> VocText2IDs = new HashMap<>();
 	// private static Vocabulary instance = null;
 	private Dataset mDataset = null;
 	private int mLevel = -1;
@@ -32,6 +33,10 @@ public class Vocabulary {
 
 	public Dataset getDataset() {
 		return mDataset;
+	}
+
+	public List<DBWord> getWordList() {
+		return VocList;
 	}
 
 	public Vocabulary(Dataset dat, int level) {
@@ -65,11 +70,16 @@ public class Vocabulary {
 	private void addDBWord(DBWord w) throws IOException {
 
 		int id = w.getID();
-//		if (id != VocList.size())
-//			throw new IOException(
-//					"got error while reading words from DB, data might be corrupted");
+		// if (id != VocList.size())
+		// throw new IOException(
+		// "got error while reading words from DB, data might be corrupted");
 		VocList.add(w);
 		VocSearchForID.put(w, id);
+		List<Integer> IDs = VocText2IDs.get(w.getText());
+		if (IDs == null)
+			IDs = new ArrayList<>();
+		IDs.add(id);
+		VocText2IDs.put(w.getText(), IDs);
 	}
 
 	private int addNewWord(String text, byte POS, int count) {
@@ -77,6 +87,13 @@ public class Vocabulary {
 		DBWord w = new DBWord(id, text, POS, count);
 		VocList.add(w);
 		VocSearchForID.put(w, id);
+
+		List<Integer> IDs = VocText2IDs.get(text);
+		if (IDs == null)
+			IDs = new ArrayList<>();
+		IDs.add(id);
+		VocText2IDs.put(text, IDs);
+
 		return id;
 	}
 
@@ -95,9 +112,9 @@ public class Vocabulary {
 
 	private DBWord getWord(int keywordid) {
 		DBWord word = null;
-		try{
+		try {
 			word = VocList.get(keywordid);
-		}catch(IndexOutOfBoundsException e){
+		} catch (IndexOutOfBoundsException e) {
 			// do nothing, just return null is fine
 		}
 		return word;
@@ -122,6 +139,11 @@ public class Vocabulary {
 				mLevel);
 		System.out.println(">> Wrote " + VocList.size() + " words");
 
+	}
+
+	public List<Integer> getWordIDs(String word) {
+		// TODO Auto-generated method stub
+		return VocText2IDs.get(word);
 	}
 
 	// public String getText(int id) throws Exception {

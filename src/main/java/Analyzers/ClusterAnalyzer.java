@@ -49,22 +49,44 @@ public class ClusterAnalyzer {
 		// clusterPhrases("D:/projects/ALPACA/NSF/concepts/seeds_beta.csv",
 		// "D:/projects/ALPACA/NSF/clusters/seeds_beta.csv",
 		// "D:/projects/ALPACA/NSF/vectors.txt", AVERAGE_JACCARD, 0.3);
-		clusterWords(
-				"D:/projects/ALPACA/OLDREVIEWS/com.facebook.orca/clusters/seeds_beta.csv",
-				"D:/projects/ALPACA/OLDREVIEWS/ReviewVectors.txt",
-				AVERAGE_JACCARD, SCORING_FILENAME,
-				KeywordAnalyzer.CONTRAST_SCORE, 1000);
+		// clusterWords(
+		// "D:/projects/ALPACA/OLDREVIEWS/com.facebook.orca/clusters/seeds_beta.csv",
+		// "D:/projects/ALPACA/OLDREVIEWS/ReviewVectors.txt",
+		// AVERAGE_JACCARD, SCORING_FILENAME,
+		// KeywordAnalyzer.CONTRAST_SCORE, 1000);
 	}
 
-	public static void clusterWords(String outputFile, String vectorFile,
-			int typeOfSimMetric, String scoreFile, int typeOfScore, int topNumber)
-			throws Throwable {
-		WordVec word2vec = new WordVec(vectorFile);
+	public static void clusterWords(String outputFile, WordVec word2vec,
+			int typeOfSimMetric, String inputFile, String scoreFile,
+			int typeOfScore) throws Throwable {
 		System.out.println("> Reading words from file");
 		readWordsSkewness(typeOfScore, scoreFile);
-		ArrayList<Item> words = loadWordsIntoItemList(wordScore, word2vec);
+		ArrayList<Item> words = readWordsFromFile(inputFile, word2vec);
 		cluster(new File(outputFile), words, typeOfSimMetric, word2vec);
 		System.out.println("> Done!");
+	}
+
+	public static ArrayList<Item> readWordsFromFile(String fileName,
+			WordVec word2vec) throws Throwable {
+		ArrayList<Item> words = new ArrayList<>();
+		Map<String, Double> phrasesset = new HashMap<>();
+		Scanner scn = new Scanner(new FileReader(fileName));
+		// String first = br.nextLine();
+		int count = 0;
+		while (scn.hasNextLine()) {
+			String phrase = scn.nextLine();
+			phrasesset.put(phrase, 0d);
+		}
+		for (Entry<String, Double> phrase : phrasesset.entrySet()) {
+			Item item = new Item(phrase.getKey(), phrase.getValue(), 0,
+					word2vec);
+			if (item.getVector() != null)
+				words.add(item);
+			count++;
+		}
+		scn.close();
+		System.out.println(">> Done! Read " + count + " words and phrases!");
+		return words;
 	}
 
 	public static void clusterPhrases(String inputFile, String outputFile,
@@ -172,7 +194,7 @@ public class ClusterAnalyzer {
 				continue;
 			List<ItemWithSim> temporaryClusterHolder = new ArrayList<>();
 			ItemWithSim leader = new ItemWithSim(item, 1.0);
-			leader.score = item.badScore;
+			// leader.score = item.badScore;
 			temporaryClusterHolder.add(leader);
 			for (Item itemForReference : itemList) {
 				if (itemForReference.vector == null
@@ -192,7 +214,7 @@ public class ClusterAnalyzer {
 					continue;
 				if (temporaryClusterHolder.contains(newItem))
 					continue;
-				leader.score += itemForReference.badScore;
+				// leader.score += itemForReference.badScore;
 				temporaryClusterHolder.add(newItem);
 			}
 			// results.add(temporaryClusterHolder);
@@ -404,8 +426,8 @@ public class ClusterAnalyzer {
 	public static class Item extends Clusterable {
 		double[] vector = null;
 		private String gram;
-		private double badScore;
-		private double goodScore;
+		// private double badScore;
+		// private double goodScore;
 		private Set<String> actualPhrase;
 		boolean change = false;
 		private List<String> expandedPhrases = null;
@@ -453,8 +475,8 @@ public class ClusterAnalyzer {
 				readWordsSkewness(KeywordAnalyzer.WEIBULL_FREQUENCY,
 						SCORING_FILENAME);
 			gram = grm;
-			badScore = bad;
-			goodScore = good;
+			// badScore = bad;
+			// goodScore = good;
 			actualPhrase = new HashSet<>();
 			if (word2vec != null) {
 				POSTagConverter POSconverter = POSTagConverter.getInstance();

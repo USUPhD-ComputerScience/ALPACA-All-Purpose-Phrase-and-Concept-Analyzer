@@ -7,6 +7,7 @@ import java.io.PrintWriter;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -58,6 +59,7 @@ public class PhraseAnalyzer {
 	private Set<String> intensifiers = new HashSet<>();
 	private Set<String> topicWords = new HashSet<>();
 	private Set<String> others = new HashSet<>();
+	private Set<String> whs = new HashSet<>();
 	private Set<String> interestingWords = new HashSet<>();
 	private Set<String> essentialWords = new HashSet<>();
 	private Set<String> connNegInt = new HashSet<>();
@@ -68,8 +70,9 @@ public class PhraseAnalyzer {
 	private static final HashSet<String> POSTAG_OF_VERB = new HashSet<>(
 			Arrays.asList(new String[] { "VBG", "VBP", "VB", "VP", "@VP", "VBZ",
 					"VBN" }));
-	private Map<String, Double> wordScore = null;
-	private static final String SCORING_FILENAME = "D:\\projects\\ALPACA\\NSF\\wordScore\\scoreLV2.csv";
+	// private Map<String, Double> wordScore = null;
+	// private static final String SCORING_FILENAME =
+	// "D:\\projects\\ALPACA\\NSF\\wordScore\\scoreLV2.csv";
 	Set<Long> posPattern = null;
 	private static final Map<ImmutableList<Integer>, Integer> TRAINING_DATA_INSTANCE_FREQ = new HashMap<>();
 	static final Map<ImmutableList<Integer>, Integer> TESTING_DATA_INSTANCE_FREQ = new HashMap<>();
@@ -98,28 +101,30 @@ public class PhraseAnalyzer {
 		connectors.addAll(
 				loadWordsSet(new File(TextNormalizer.getDictionaryDirectory()
 						+ "baseword/misc/connectors.txt")));
-		TextNormalizer.getInstance();
 		negations.addAll(
 				loadWordsSet(new File(TextNormalizer.getDictionaryDirectory()
 						+ "baseword/misc/negations.txt")));
-		TextNormalizer.getInstance();
 		intensifiers.addAll(
 				loadWordsSet(new File(TextNormalizer.getDictionaryDirectory()
 						+ "baseword/misc/intensifiers.txt")));
+		whs.addAll(loadWordsSet(new File(TextNormalizer.getDictionaryDirectory()
+				+ "baseword/misc/wh.txt")));
+		others.addAll(loadWordsSet(
+				new File(TextNormalizer.getDictionaryDirectory()
+						+ "baseword/misc/others.txt")));
 		connNegInt.addAll(connectors);
 		connNegInt.addAll(negations);
 		connNegInt.addAll(intensifiers);
 		interestingWords.addAll(connectors);
 		interestingWords.addAll(negations);
 		interestingWords.addAll(intensifiers);
+		interestingWords.addAll(whs);
+		interestingWords.addAll(others);
 		sentimentors.addAll(loadWordsSet(
 				new File("D:\\projects\\concernsReviews\\ADJ\\badWords.csv")));
 		sentimentors.addAll(loadWordsSet(
 				new File("D:\\projects\\concernsReviews\\ADJ\\goodWords.csv")));
-		others.addAll(loadWordsSet(
-				new File("D:\\projects\\concernsReviews\\ADJ\\others.txt")));
-		interestingWords.addAll(sentimentors);
-		interestingWords.addAll(others);
+		//interestingWords.addAll(sentimentors);
 		List<String> topicFiles = Util
 				.listFilesForFolder("D:\\projects\\concernsReviews\\topics");
 		for (String topicFile : topicFiles) {
@@ -129,7 +134,7 @@ public class PhraseAnalyzer {
 		POSconverter.extendPOSLIST(connNegInt);
 		posPattern = getPOSpatterns(
 				"D:\\projects\\concernsReviews\\POSpatterns\\posPattern.csv");
-		interestingWords.addAll(topicWords);
+		//interestingWords.addAll(topicWords);
 		essentialWords.addAll(topicWords);
 		essentialWords.addAll(sentimentors);
 		essentialWords.addAll(others);
@@ -186,33 +191,25 @@ public class PhraseAnalyzer {
 				"D:\\projects\\concernsReviews\\appCategories\\work.txt")));
 	}
 
-	public void readWordsSkewness(int typeOfScore, String fileName)
-			throws Throwable {
-		wordScore = new HashMap<>();
-		CSVReader reader = new CSVReader(new FileReader(fileName), ',',
-				CSVWriter.DEFAULT_ESCAPE_CHARACTER);
-		String[] line = reader.readNext();
-		Set<String> stopWord = NatureLanguageProcessor.getInstance()
-				.getStopWordSet();
-		while ((line = reader.readNext()) != null) {
-			if (stopWord.contains(line[0]))
-				continue;
-			double score = Double.valueOf(line[typeOfScore]);
-			wordScore.put(line[0], score);
+	public List<String> expandPhrase(Dataset dataset, Collection<String> input,
+			int level, Map<String, Double> wordScore) throws Throwable {
+		Vocabulary voc = dataset.getVocabulary();
+		Set<Integer> filterSet = new HashSet<>();
+		for (String phrase : input) {
+			// break input into words
+			List<String> words = NatureLanguageProcessor
+					.wordSplit_wordOnly(phrase);
+			// get all word id with the same text
+			for (String w : words) {
+				List<Integer> wordIDs = voc.getWordIDs(w);
+				if (wordIDs != null)
+					filterSet.addAll(wordIDs);
+			}
+
 		}
-		reader.close();
-	}
-
-	public void extractFeatures(Dataset dataset, String seedFileOutput,
-			int level, int scoring) throws Throwable {
-
-		// <monthYear, <ngram, dist>>
-		Map<Integer, Map<String, int[]>> ngramAll_temp = new HashMap<>();
-		// <monthYear, <app,<ngram, dist>>>
-		Map<Integer, Map<String, Map<String, int[]>>> ngramEach_temp = new HashMap<>();
-		// List<Application> appList = appMan.getAppList();
-		PrintWriter seedFile = new PrintWriter(new File(seedFileOutput));
-		int docCount = 0;
+		if (filterSet.isEmpty())
+			return null;
+		List<String> output = new ArrayList<>();
 		for (Document doc : dataset.getDocumentSet()) {
 			if (!doc.isEnglish())
 				continue;
@@ -223,28 +220,62 @@ public class PhraseAnalyzer {
 			// wordCount += rev.toString().split(" ").length;
 			Set<Item> nGrams = null;
 			nGrams = extractSequence_ByPattern_LENSENTCON(doc.getSentences(),
-					posPattern, true, scoring, dataset.getVocabulary());
+					posPattern, true, voc, filterSet, wordScore);
 			if (nGrams == null)
 				continue;
 			for (Item gram : nGrams) {
-				seedFile.println(gram.gram + "," + doc.getRawTextFileName()
-						+ "," + gram.badScore);
+				output.add(gram.gram);
 			}
-			// int month = Util.getMonth(doc.getTime());
-			// continue;
-			// updateAllDist(rating, nGrams, month, ngramAll_temp);
-
-			docCount++;
-			if (docCount % 1000 == 0)
-				System.out.println("Processed " + docCount);
 		}
-
-		System.out.println("Processed " + docCount);
+		return output;
 		// calculate distributions
 		// ngramAll.putAll(ngramAll_temp);
-		System.out.println("Done extracting phrases");
-		seedFile.close();
+		// System.out.println("Done extracting phrases");
 	}
+
+	// public void extractFeatures(Dataset dataset, String seedFileOutput,
+	// int level, int scoring) throws Throwable {
+	//
+	// // <monthYear, <ngram, dist>>
+	// Map<Integer, Map<String, int[]>> ngramAll_temp = new HashMap<>();
+	// // <monthYear, <app,<ngram, dist>>>
+	// Map<Integer, Map<String, Map<String, int[]>>> ngramEach_temp = new
+	// HashMap<>();
+	// // List<Application> appList = appMan.getAppList();
+	// PrintWriter seedFile = new PrintWriter(new File(seedFileOutput));
+	// int docCount = 0;
+	// for (Document doc : dataset.getDocumentSet()) {
+	// if (!doc.isEnglish())
+	// continue;
+	// doc.populatePreprocessedDataFromDB(level, dataset);
+	// int rating = doc.getRating();
+	//
+	// // String revString = doc.toString(false);
+	// // wordCount += rev.toString().split(" ").length;
+	// Set<Item> nGrams = null;
+	// nGrams = extractSequence_ByPattern_LENSENTCON(doc.getSentences(),
+	// posPattern, true, scoring, dataset.getVocabulary());
+	// if (nGrams == null)
+	// continue;
+	// for (Item gram : nGrams) {
+	// seedFile.println(gram.gram + "," + doc.getRawTextFileName()
+	// + "," + gram.badScore);
+	// }
+	// // int month = Util.getMonth(doc.getTime());
+	// // continue;
+	// // updateAllDist(rating, nGrams, month, ngramAll_temp);
+	//
+	// docCount++;
+	// if (docCount % 1000 == 0)
+	// System.out.println("Processed " + docCount);
+	// }
+	//
+	// System.out.println("Processed " + docCount);
+	// // calculate distributions
+	// // ngramAll.putAll(ngramAll_temp);
+	// System.out.println("Done extracting phrases");
+	// seedFile.close();
+	// }
 
 	private void updateAllDist(int rating, Set<Item> nGrams, int month,
 			Map<Integer, Map<String, int[]>> ngramAll_temp) {
@@ -265,8 +296,9 @@ public class PhraseAnalyzer {
 
 	// choosing phrase: log(length) * sentiment (stanford) * log(skewness).
 	public Set<Item> extractSequence_ByPattern_LENSENTCON(int[][] sentences,
-			Set<Long> patternSet, boolean actualString, int scoring,
-			Vocabulary voc) throws Throwable {
+			Set<Long> patternSet, boolean actualString, Vocabulary voc,
+			Set<Integer> filterSet, Map<String, Double> wordScore)
+			throws Throwable {
 		Set<Item> sequenceSet = new HashSet<>();
 
 		if (sentences == null) {
@@ -278,7 +310,7 @@ public class PhraseAnalyzer {
 		for (int s = 0; s < sentences.length; s++) {
 			int[] wordList = sentences[s];
 			List<Seed> results = getsequence_LocalOptimal(wordList, patternSet,
-					voc);
+					voc, filterSet, wordScore);
 			if (results == null)
 				continue;
 			for (Seed seed : results) {
@@ -396,8 +428,8 @@ public class PhraseAnalyzer {
 				Map<String, Double> wordScore) throws Exception {
 			double sum = 0;
 			for (int i = start; i <= end; i++) {
-				Double value = wordScore
-						.get(voc.getWordFromDB(wordList[i]).getText());
+				DBWord w = voc.getWordFromDB(wordList[i]);
+				Double value = wordScore.get(w.getText());
 				if (value == null)
 					continue;
 				sum += value;
@@ -407,9 +439,19 @@ public class PhraseAnalyzer {
 		}
 	}
 
+	private static boolean isContaining(int[] wordList, int s, int e,
+			Set<Integer> filterSet) {
+		for (int i = s; i < e; i++) {
+			if (filterSet.contains(wordList[i]))
+				return true;
+		}
+		return false;
+	}
+
 	// modified matrix chain order to find all possible parenthesization.
 	public List<Seed> getsequence_LocalOptimal(int[] wordList,
-			Set<Long> patternSet, Vocabulary voc) throws Throwable {
+			Set<Long> patternSet, Vocabulary voc, Set<Integer> filterSet,
+			Map<String, Double> wordScore) throws Throwable {
 		// step 1: find seeds (a sequence of Verb/Noun/ADJ)
 		// step 2: find seed with max score.
 		// score = sum(all individual words) * log(length)/length
@@ -440,12 +482,15 @@ public class PhraseAnalyzer {
 						templatedSeed.add(newSeed);
 					}
 					seedList.add(newSeed);
+					boolean containWoI = isContaining(wordList, start, i - 1,
+							filterSet);
 					start = -1;
-					if (biggestSeed == null) {
+
+					if (biggestSeed == null && containWoI) {
 						biggestSeed = newSeed;
 						biggestSeedLocation = seedList.size() - 1;
 					} else {
-						if (newSeed.score > biggestSeed.score) {
+						if ((biggestSeed == null || newSeed.score > biggestSeed.score) && containWoI) {
 							biggestSeed = newSeed;
 							biggestSeedLocation = seedList.size() - 1;
 						}
@@ -462,13 +507,15 @@ public class PhraseAnalyzer {
 						templatedSeed.add(newSeed);
 					}
 					seedList.add(newSeed);
+					boolean containWoI = isContaining(wordList, start, i - 1,
+							filterSet);
 					start = -1;
-					if (biggestSeed == null) {
+					if (biggestSeed == null && containWoI) {
 						biggestSeed = newSeed;
 						biggestSeedLocation = seedList.size() - 1;
 
 					} else {
-						if (newSeed.score > biggestSeed.score) {
+						if ((biggestSeed == null || newSeed.score > biggestSeed.score) && containWoI) {
 							biggestSeed = newSeed;
 							biggestSeedLocation = seedList.size() - 1;
 						}
@@ -533,13 +580,18 @@ public class PhraseAnalyzer {
 			// update current seedlist and the new biggest seed
 			List<Seed> tempList = new ArrayList<>();
 			for (int s = 0; s < seedList.size(); s++) {
-				if (maxSeed == leftNewSeed && s == (biggestSeedLocation - 1)) {
+
+				boolean containWoI = isContaining(wordList, maxSeed.start,
+						maxSeed.end, filterSet);
+				if (maxSeed == leftNewSeed && s == (biggestSeedLocation - 1)
+						&& containWoI) {
 					tempList.add(maxSeed);
 					biggestSeedLocation = tempList.size() - 1;
 					biggestSeed = maxSeed;
 					s++; // jump over one
 				}
-				if (maxSeed == rightNewSeed && s == (biggestSeedLocation)) {
+				if (maxSeed == rightNewSeed && s == (biggestSeedLocation)
+						&& containWoI) {
 					tempList.add(maxSeed);
 					biggestSeedLocation = tempList.size() - 1;
 					biggestSeed = maxSeed;
@@ -548,9 +600,9 @@ public class PhraseAnalyzer {
 				tempList.add(seedList.get(s));
 			}
 
-			if (tempList.size() == 4 && biggestSeedLocation == 6
-					&& seedList.size() == 8)
-				System.err.println();
+			// if (tempList.size() == 4 && biggestSeedLocation == 6
+			// && seedList.size() == 8)
+			// System.err.println();
 			seedList = tempList;
 		}
 		// step 4: choose non over-lapping longer templated seeds
@@ -568,8 +620,8 @@ public class PhraseAnalyzer {
 
 	// modified matrix chain order to find all possible parenthesization.
 	public SequenceScore calculateMaxSequenceScores(int[] wordList,
-			Set<Long> patternSet, int scoring, Vocabulary voc)
-			throws Throwable {
+			Set<Long> patternSet, int scoring, Vocabulary voc,
+			Map<String, Double> wordScore) throws Throwable {
 		int n = wordList.length;
 		double[][] maxCost = new double[n][n];
 		int[][] split = new int[n][n];
@@ -579,7 +631,7 @@ public class PhraseAnalyzer {
 			switch (scoring) {
 			case SCORING_USER:
 				maxCost[i][i] = computeScoreForSequence_SKEWNESS(wordList,
-						patternSet, i, i, voc);
+						patternSet, i, i, voc, wordScore);
 				break;
 			case SCORING_STANFORD_SENTIMENT:
 				maxCost[i][i] = computeScoreForSequence_STANFORDS_SENTIMENT(
@@ -595,7 +647,7 @@ public class PhraseAnalyzer {
 				switch (scoring) {
 				case SCORING_USER:
 					maxCost[i][j] = computeScoreForSequence_SKEWNESS(wordList,
-							patternSet, i, j, voc); // cost of the
+							patternSet, i, j, voc, wordScore); // cost of the
 					break;
 				case SCORING_STANFORD_SENTIMENT:
 					maxCost[i][j] = computeScoreForSequence_STANFORDS_SENTIMENT(
@@ -735,11 +787,8 @@ public class PhraseAnalyzer {
 
 	// length * log(skewness).
 	private double computeScoreForSequence_SKEWNESS(int[] wordList,
-			Set<Long> patternSet, int start, int end, Vocabulary voc)
-			throws Throwable {
-		if (wordScore == null)
-			readWordsSkewness(KeywordAnalyzer.WEIBULL_FREQUENCY,
-					SCORING_FILENAME);
+			Set<Long> patternSet, int start, int end, Vocabulary voc,
+			Map<String, Double> wordScore) throws Throwable {
 		double score1 = 0.0d;
 		if (end - start >= 8)
 			return score1;

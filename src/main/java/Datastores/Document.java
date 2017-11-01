@@ -119,7 +119,7 @@ public class Document {
 		// String[] rawSentences = nlp.extractSentence(rawText);
 		String rawtext = readRawTextFromDirectory(directory);
 		List<List<String>> normalizedSentences = normalizer
-				.normalize_SplitSentence(rawtext, level);
+				.normalize_SplitSentence(rawtext, level,true);
 		// return and don't process further if this review is non english
 		if (normalizedSentences == null) {
 			isEnglish = false;

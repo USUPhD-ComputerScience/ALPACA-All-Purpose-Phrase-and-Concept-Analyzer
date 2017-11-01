@@ -14,14 +14,14 @@ public class ConceptAnalysis {
 				"D:\\EclipseWorkspace\\TextNormalizer\\config.INI");
 
 		long start = System.currentTimeMillis();
-		analyzer.readWordsSkewness(KeywordAnalyzer.WEIBULL_FREQUENCY,
-				"D:\\projects\\ALPACA\\NSF\\wordScore\\scoreLV2.csv");
+		// analyzer.readWordsSkewness(KeywordAnalyzer.WEIBULL_FREQUENCY,
+		// "D:\\projects\\ALPACA\\NSF\\wordScore\\scoreLV2.csv");
 		Dataset data = Alpaca.readProcessedData("D:/projects/ALPACA/NSF/",
 				PreprocesorMain.LV2_ROOTWORD_STEMMING);
-		analyzer.extractFeatures(data,
-				"D:\\projects\\ALPACA\\NSF\\concepts\\seeds_beta.csv",
-				PreprocesorMain.LV2_ROOTWORD_STEMMING,
-				PhraseAnalyzer.SCORING_STANFORD_SENTIMENT);
+		// analyzer.extractFeatures(data,
+		// "D:\\projects\\ALPACA\\NSF\\concepts\\seeds_beta.csv",
+		// PreprocesorMain.LV2_ROOTWORD_STEMMING,
+		// PhraseAnalyzer.SCORING_STANFORD_SENTIMENT);
 		System.out.println(" Done! extracting features took "
 				+ (double) (System.currentTimeMillis() - start) / 1000 / 60
 				+ "minutes");
@@ -37,8 +37,8 @@ public class ConceptAnalysis {
 				"D:\\EclipseWorkspace\\TextNormalizer\\config.INI");
 
 		long start = System.currentTimeMillis();
-		analyzer.readWordsSkewness(typeOfScore, scoringFile);
-		analyzer.extractFeatures(data, outputFile, level, phraseScoring);
+		// analyzer.readWordsSkewness(typeOfScore, scoringFile);
+		// analyzer.extractFeatures(data, outputFile, level, phraseScoring);
 		System.out.println(" Done! extracting features took "
 				+ (double) (System.currentTimeMillis() - start) / 1000 / 60
 				+ "minutes");
