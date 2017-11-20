@@ -22,9 +22,10 @@ import com.opencsv.CSVReader;
 import com.opencsv.CSVWriter;
 
 import Analyzers.ClusterAnalyzer;
-import Analyzers.ExtractCommonPhraseStructure;
+import Analyzers.ExtractCommonPatterns;
 import Analyzers.KeywordAnalyzer;
 import Analyzers.KeywordExplorer;
+import Analyzers.PhraseAnalyzer;
 import Analyzers.TrendAnalyzer;
 import Datastores.Dataset;
 import Datastores.Document;
@@ -47,20 +48,20 @@ public class Alpaca {
 	private int scoringScheme = -1;
 	private Double optional_Similarity_Threshold = null;
 	private Map<String, Double> wordScore = null;
+	private Map<String, Double> IDFWeights = null;
 
 	public void readWordsSkewness(int typeOfScore, String fileName)
 			throws Throwable {
 		wordScore = new HashMap<>();
+		IDFWeights = new HashMap<>();
 		CSVReader reader = new CSVReader(new FileReader(fileName), ',',
 				CSVWriter.DEFAULT_ESCAPE_CHARACTER);
 		String[] line = reader.readNext();
-		Set<String> stopWord = NatureLanguageProcessor.getInstance()
-				.getStopWordSet();
 		while ((line = reader.readNext()) != null) {
-			if (stopWord.contains(line[0]))
-				continue;
 			double score = Double.valueOf(line[typeOfScore]);
+			double idf = Double.valueOf(line[KeywordAnalyzer.TFIDF]);
 			wordScore.put(line[0], score);
+			IDFWeights.put(line[0], idf);
 		}
 		reader.close();
 	}
@@ -70,18 +71,32 @@ public class Alpaca {
 		wordTopics = new HashMap<>();
 		variables = new HashMap<>();
 	}
+
 	@Command(description = "analyze and extract phrase templates", name = "templates", abbrev = "temp")
 	public void extractTemplates(String directory, String fileoutput,
-			int numberOfSentence) throws Throwable {
+			int numberOfSentence, boolean strict) throws Throwable {
+		if (currentLevel == -1) {
+			System.out.println("Please choose stemmer level first");
+			return;
+		}
 		String realInput = variables.get(directory);
 		if (realInput != null)
 			directory = realInput;
 		String realOutput = variables.get(fileoutput);
 		if (realOutput != null)
 			fileoutput = realOutput;
-		ExtractCommonPhraseStructure ecps = new ExtractCommonPhraseStructure();
+		ExtractCommonPatterns ecps = new ExtractCommonPatterns();
 		ecps.processPhrases(directory, numberOfSentence,
-				PreprocesorMain.LV2_ROOTWORD_STEMMING, fileoutput);
+				currentLevel, fileoutput, strict);
+	}
+
+	@Command(description = "change the source of POS patterns", name = "change_patterns", abbrev = "patt")
+	public void changePOSpatterns(String fileInput)
+			throws FileNotFoundException, Throwable {
+		String realInput = variables.get(fileInput);
+		if (realInput != null)
+			fileInput = realInput;
+		PhraseAnalyzer.getInstance().changePOSpatterns(fileInput);
 	}
 
 	@Command
@@ -152,7 +167,7 @@ public class Alpaca {
 	}
 
 	@Command(description = "set up threshold for similarity when expanding words", name = "threshold")
-	public void setupAdditionalTextfFile(double threashold) {
+	public void setupThreshold(double threashold) {
 		if (threashold <= 0 || threashold > 1) {
 			System.err.println(
 					"Threshold can't be less or equal to zero nor it can be bigger than 1");
@@ -301,9 +316,9 @@ public class Alpaca {
 	}
 
 	@Command(description = "analyze trends and write to file", name = "trends", abbrev = "trd")
-	public void analyzeTrends(String inputFile, String directory)
-			throws Exception {
-
+	public void analyzeTrends(String inputFile, String directory) throws Exception {
+		// current version only support non major topic
+		boolean onlyAsMajorTopic = false;
 		String realInput = variables.get(inputFile);
 		if (realInput != null)
 			inputFile = realInput;
@@ -330,22 +345,47 @@ public class Alpaca {
 		// just frequency
 		System.out.println(
 				"Analyzing raw frequency trends (appearance over years)");
-		Map<Integer, Integer> rawFtrends = TrendAnalyzer
-				.getPhraseTrend_Frequency(currentDataset, termset);
-		PrintWriter pw = new PrintWriter(
-				new File(directory + "rawFrequencyTrends.csv"));
-		for (Entry<Integer, Integer> entry : rawFtrends.entrySet()) {
-			pw.println(entry.getKey() + "," + entry.getValue());
-		}
-		pw.close();
+		Map<Integer, Integer> rawFtrends = null;
+		if (onlyAsMajorTopic)
+			rawFtrends = TrendAnalyzer.getPhraseTrend_Frequency(currentDataset,
+					termset, true);
+		else
+			rawFtrends = TrendAnalyzer.getPhraseTrend_Frequency(currentDataset,
+					termset, false);
+
 		System.out.println(
 				"Analyzing portional frequency trends (percentage of appearance over total reviews over years)");
-		Map<Integer, Float> porFtrends = TrendAnalyzer
-				.getPhraseTrend_Percentage(currentDataset, termset);
-		pw = new PrintWriter(
+		Map<Integer, Float> porFtrends = null;
+
+		if (onlyAsMajorTopic)
+			porFtrends = TrendAnalyzer.getPhraseTrend_Percentage(currentDataset,
+					termset, true);
+		else
+			porFtrends = TrendAnalyzer.getPhraseTrend_Percentage(currentDataset,
+					termset, false);
+		Map<Integer, Integer> valueTrends = null;
+
+		if (onlyAsMajorTopic)
+			valueTrends = TrendAnalyzer.getPhraseTrend_valueAccumulation(
+					currentDataset, termset, true);
+		else
+			valueTrends = TrendAnalyzer.getPhraseTrend_valueAccumulation(
+					currentDataset, termset, false);
+		Map<Integer, Integer> totalCount = TrendAnalyzer
+				.gatherFrequencyOverYearAll(currentDataset);
+		PrintWriter pw = new PrintWriter(
 				new File(directory + "portionalFrequencyTrends.csv"));
+		pw.println(
+				"year,percentage of documents, frequency, accumulated value/rating, total documents of this dataset");
 		for (Entry<Integer, Float> entry : porFtrends.entrySet()) {
-			pw.println(entry.getKey() + "," + entry.getValue());
+			int key = entry.getKey();
+			Integer rawFreq = rawFtrends.get(key);
+			Integer value = valueTrends.get(key);
+			Integer total = totalCount.get(key);
+			if (value == null)
+				value = 0;
+			pw.println(key + "," + entry.getValue() + "," + rawFreq + ","
+					+ value + "," + total);
 		}
 		pw.close();
 		System.out.println("done printing");
@@ -353,8 +393,8 @@ public class Alpaca {
 	}
 
 	@Command(description = "expand words from a topic to phrases", name = "expand", abbrev = "expt")
-	public void expandWords_topic(String topic) throws Throwable {
-		List<String> words = wordTopics.get(topic);
+	public void expandWords_topic(String... args) throws Throwable {
+		List<String> words = wordTopics.get(args[0]);
 		if (words == null) {
 			System.out.println("You haven't defined this topic yet!");
 			return;
@@ -367,22 +407,25 @@ public class Alpaca {
 			System.out.println("you have to set up a word scoring file first!");
 			return;
 		}
+		if (args.length == 2)
+			setupThreshold(Double.parseDouble(args[1]));
 		readWordsSkewness(scoringScheme, wordScoreFile);
 		if (currentDataset == null)
 			currentDataset = Alpaca.readProcessedData(dataDirectory,
 					currentLevel);
 		Set<String> result = KeywordExplorer.expand(words, word2vec,
-				currentDataset, wordScore, optional_Similarity_Threshold);
+				currentDataset, wordScore, optional_Similarity_Threshold,
+				IDFWeights);
 		print2Files(currentDataset, result);
 		System.out.println();
 
 	}
 
 	@Command(description = "expand words from a file to phrases", name = "expand_from_file", abbrev = "expf")
-	public void expandWords_file(String inputFile) throws Throwable {
-		String realInput = variables.get(inputFile);
+	public void expandWords_file(String... args) throws Throwable {
+		String realInput = variables.get(args[0]);
 		if (realInput != null)
-			inputFile = realInput;
+			args[0] = realInput;
 		if (word2vec == null) {
 			System.out.println("you have to set up a vector file first!");
 			return;
@@ -391,18 +434,21 @@ public class Alpaca {
 			System.out.println("you have to set up a word scoring file first!");
 			return;
 		}
+		if (args.length == 2)
+			setupThreshold(Double.parseDouble(args[1]));
 		readWordsSkewness(scoringScheme, wordScoreFile);
 		if (currentDataset == null)
 			currentDataset = Alpaca.readProcessedData(dataDirectory,
 					currentLevel);
 		List<String> termset = new ArrayList<>();
-		Scanner scn = new Scanner(new File(inputFile));
+		Scanner scn = new Scanner(new File(args[0]));
 		while (scn.hasNext()) {
 			termset.add(scn.nextLine());
 		}
 		scn.close();
 		Set<String> result = KeywordExplorer.expand(termset, word2vec,
-				currentDataset, wordScore, optional_Similarity_Threshold);
+				currentDataset, wordScore, optional_Similarity_Threshold,
+				IDFWeights);
 		print2Files(currentDataset, result);
 		System.out.println();
 
@@ -451,25 +497,31 @@ public class Alpaca {
 					currentLevel);
 		KeywordAnalyzer analyzer = new KeywordAnalyzer();
 		analyzer.calculateAndWriteKeywordScore(currentDataset, currentLevel,
-				1000, isFiveStarReview);
+				isFiveStarReview);
 	}
 
 	@Command(description = "run configuration script", name = "scripting", abbrev = "script")
-	public void readConfigScript(String fileName) {
+	public void readConfigScript(String fileName)
+			throws FileNotFoundException, Throwable {
 		Scanner scn = null;
 		String dataf = null;
 		String conf = null;
 		String scowf = null;
 		String textf = null;
+		String patt = null;
 		String[] args = null;
 		int level = -1;
 		int score = -1;
+		double threshold = -1;
 		String vectorf = null;
 		try {
 			scn = new Scanner(new File(fileName));
 			int lineCount = 1;
 			while (scn.hasNext()) {
 				String[] line = scn.nextLine().split(" ");
+				if(line[0].charAt(0) == '%')
+					continue;
+						
 				switch (line[0]) {
 				case "dataf":
 					if (line.length != 2) {
@@ -543,6 +595,14 @@ public class Alpaca {
 					}
 					score = Integer.parseInt(line[1]);
 					break;
+				case "threshold":
+					if (line.length != 2) {
+						System.out
+								.println("Error reading at line " + lineCount);
+						return;
+					}
+					threshold = Double.parseDouble(line[1]);
+					break;
 				case "textf":
 					if (line.length != 2) {
 						System.out
@@ -550,6 +610,14 @@ public class Alpaca {
 						return;
 					}
 					textf = line[1];
+					break;
+				case "patt":
+					if (line.length != 2) {
+						System.out
+								.println("Error reading at line " + lineCount);
+						return;
+					}
+					patt = line[1];
 					break;
 				case "var":
 					if (line.length != 3) {
@@ -560,6 +628,7 @@ public class Alpaca {
 					createVariable(new String[] { line[1], line[2] });
 					break;
 				default:
+					System.out.println("Can't intepret line " + lineCount);
 					break;
 				}
 				lineCount++;
@@ -592,6 +661,10 @@ public class Alpaca {
 			setupAdditionalTextfFile(textf);
 		if (scowf != null)
 			setupWordscoreFile(scowf);
+		if (patt != null)
+			changePOSpatterns(patt);
+		if (threshold != -1)
+			setupThreshold(threshold);
 	}
 
 	@Command(description = "setup the config file for text analyzer module", name = "config_file", abbrev = "conf")
@@ -629,6 +702,7 @@ public class Alpaca {
 
 	public static Dataset readProcessedData(String directory, int level)
 			throws Exception {
+		System.out.println("Reading preprocessed data for the first time");
 		String cleansedTextLocationDir = FileDataAdapter.getLevelLocationDir(
 				FileDataAdapter.CLEANSED_SUBDIR, directory, level);
 
@@ -640,6 +714,9 @@ public class Alpaca {
 			throw new FileNotFoundException(
 					"This file can't be found: " + metaDataFileName);
 		}
+		
+		int totalDoc = Util.listFilesForFolder(directory + "rawData//").toArray(new String[]{}).length;
+		double percentageCompleted = 0, docCompleted = 0;
 		CSVReader reader = null;
 		int count = 0;
 		try {
@@ -683,6 +760,13 @@ public class Alpaca {
 					// System.out.println("read in " + count + " documents");
 					// if (count % 51000 == 0)
 					// System.out.println("read in " + count + " documents");
+					docCompleted++;
+					double newPercentage = Util.round(100 * docCompleted / totalDoc,
+							2);
+					if (newPercentage > percentageCompleted) {
+						percentageCompleted = newPercentage;
+						Util.printProgress(percentageCompleted);
+					}
 				}
 				dataset.getVocabulary().loadDBKeyword();
 				System.out.println("read in " + count + " documents");

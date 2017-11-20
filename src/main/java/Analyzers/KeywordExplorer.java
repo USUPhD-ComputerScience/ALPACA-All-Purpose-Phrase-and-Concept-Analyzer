@@ -26,6 +26,8 @@ import Vocabulary.Vocabulary;
 
 import java.util.Map.Entry;
 
+import org.nd4j.shade.jackson.dataformat.yaml.snakeyaml.events.Event.ID;
+
 public class KeywordExplorer {
 
 	public static WordVec word2vec;
@@ -33,21 +35,26 @@ public class KeywordExplorer {
 
 	// static Map<String, Double> pairSimiliarity = new HashMap<>();
 	public static Set<String> expand(List<String> wordList, WordVec word2vec,
-			Dataset dataset, Map<String, Double> wordScore, Double optionalThreshold) throws Throwable {
+			Dataset dataset, Map<String, Double> wordScore, Double optionalThreshold, Map<String, Double> IDFWeights) throws Throwable {
 		if(optionalThreshold != null)
 			SIM_THRESHOLD = optionalThreshold;
 		else
 			SIM_THRESHOLD = 0.7; // default
 		KeywordExplorer.word2vec = word2vec;
 		System.out.println("Expanding words with similarity threshold of " + SIM_THRESHOLD);
+		System.out.println("Initialize seeds of this topic");
 		Set<VectorableToken> selection = addSingleWords(wordList, word2vec,
-				dataset);
+				dataset, IDFWeights);
 		Set<String> seeds = new HashSet<>();
+		System.out.println("The initialized seeds are: ");
 		for (VectorableToken token : selection) {
 			seeds.add(token.tokenText);
+			System.out.print(token.tokenText+ ", ");
 		}
+		System.out.println();
+		System.out.println("Begining topic expansion process");
 		Set<String> results = addPhrases(wordList, word2vec, dataset, wordScore,
-				selection, seeds);
+				selection, seeds,IDFWeights);
 		System.out.println("The result of this expansion is:");
 		for (String res : results) {
 			System.out.println(res);
@@ -60,7 +67,7 @@ public class KeywordExplorer {
 	}
 
 	private static Set<VectorableToken> addSingleWords(List<String> wordList,
-			WordVec word2vec, Dataset dataset) throws Throwable {
+			WordVec word2vec, Dataset dataset,Map<String,Double> IDFWeights) throws Throwable {
 		Set<VectorableToken> selection = new HashSet<>();
 		for (String word : wordList) {
 			if (word.contains("_")) {
@@ -71,7 +78,7 @@ public class KeywordExplorer {
 				}
 				strBuilder.deleteCharAt(strBuilder.length() - 1);
 				VectorableToken token = new VectorableToken(
-						strBuilder.toString(), word2vec);
+						strBuilder.toString(), word2vec, IDFWeights);
 				if (token.vector != null)
 					selection.add(token);
 				else
@@ -79,18 +86,18 @@ public class KeywordExplorer {
 							"This phrase doesn't exist in our dictionary: "
 									+ word);
 			} else {
-				VectorableToken token = new VectorableToken(word, word2vec);
+				VectorableToken token = new VectorableToken(word, word2vec, IDFWeights);
 				if (token.vector != null)
 					selection.add(token);
 				else
 					System.err.println(
 							"This word doesn't exist in our dictionary: "
 									+ word);
-				selection.add(token);
+				//selection.add(token);
 			}
 		}
 
-		autoExploreKeyWords(selection, SIM_THRESHOLD, dataset.getVocabulary());
+		autoExploreKeyWords(selection, SIM_THRESHOLD, dataset.getVocabulary(), IDFWeights);
 		return selection;
 	}
 
@@ -98,29 +105,33 @@ public class KeywordExplorer {
 
 	private static Set<String> addPhrases(List<String> wordList,
 			WordVec word2vec, Dataset dataset, Map<String, Double> wordScore,
-			Set<VectorableToken> selection, Set<String> seeds)
+			Set<VectorableToken> selection, Set<String> seeds,Map<String, Double> IDFWeights)
 			throws Throwable {
 		Collection<String> phrases = expandToPhrase(seeds, dataset, wordScore);
+//		PrintWriter pw = new PrintWriter(new File("D:/projects/ALPACA/securityCVE/testPhrases.csv"));
+//		for(String p : phrases)
+//			pw.println(p);
+//		pw.close();
 		// if (phrases != null)
 		// selection.addAll(phrases);
 		Set<String> results = new HashSet<>();
 		double averageSim = avgSimilarity(selection);
 		for (String phrase : phrases) {
-			VectorableToken phraseToken = new VectorableToken(phrase, word2vec);
+			VectorableToken phraseToken = new VectorableToken(phrase, word2vec,IDFWeights);
 			if (phraseToken.vector == null)
 				continue;
 			if (cosineSimilarityForWords_Avg(selection,
 					phraseToken) > SIM_THRESHOLD)
 				results.add(phrase);
 		}
-		results.addAll(wordList);
+		results.addAll(seeds);
 		return results;
 	}
 
 	private static class VectorableToken {
 		String tokenText = null;
 		float[] vector = null;
-
+		int length = 0;
 		@Override
 		public boolean equals(Object obj) {
 			// TODO Auto-generated method stub
@@ -143,21 +154,24 @@ public class KeywordExplorer {
 			return tokenText.hashCode();
 		}
 
-		public VectorableToken(String text, WordVec word2vec) {
+		public VectorableToken(String text, WordVec word2vec,Map<String,Double> IDFWeights) {
 			// TODO Auto-generated constructor stub
 			// find the vector of this text
 			tokenText = text;
 			String[] wordList = text.split(" ");
 			int validCount = 0;
 			for (String word : wordList) {
-
+				length++;
 				float[] tempVector = word2vec.getVectorForWord(word);
 				if (tempVector != null) {
 					validCount++;
 					if (vector == null)
 						vector = new float[WordVec.VECTOR_SIZE];
+					Double weight = IDFWeights.get(word);
+					if(weight == null)
+						weight = 1d;
 					for (int i = 0; i < WordVec.VECTOR_SIZE; i++) {
-						vector[i] += tempVector[i];
+						vector[i] += tempVector[i]*weight;
 					}
 				}
 			}
@@ -194,13 +208,13 @@ public class KeywordExplorer {
 	}
 
 	public static void autoExploreKeyWords(Set<VectorableToken> selection,
-			double threshold, Vocabulary voc) throws Throwable {
+			double threshold, Vocabulary voc,Map<String,Double> IDFWeights) throws Throwable {
 		System.out.println(">>Start expanding!");
 		int count = 0;
 		while (true) {
 			count++;
 			List<VectorableToken> results = findTopSimilarWords(selection, 10,
-					voc);
+					voc, IDFWeights);
 			// System.out.println(results.toString());
 			if (selection.containsAll(results)) {
 				break;
@@ -214,8 +228,8 @@ public class KeywordExplorer {
 		}
 
 		// do printing here
-		System.out.println(
-				">> done with " + count + " iteration(s) of expansion.");
+//		System.out.println(
+//				">> done with " + count + " iteration(s) of expansion.");
 
 	}
 
@@ -234,7 +248,7 @@ public class KeywordExplorer {
 	}
 
 	private static List<VectorableToken> findTopSimilarWords(
-			Set<VectorableToken> selection, int top, Vocabulary voc) {
+			Set<VectorableToken> selection, int top, Vocabulary voc,Map<String,Double> IDFWeights) {
 		String[] words = new String[top];
 		double[] cosineDistance = new double[top];
 		NatureLanguageProcessor ntlins = NatureLanguageProcessor.getInstance();
@@ -243,7 +257,7 @@ public class KeywordExplorer {
 				continue;
 			}
 			VectorableToken word2 = new VectorableToken(word.getText(),
-					word2vec);
+					word2vec,IDFWeights);
 
 			if (selection.contains(word2)) {
 				continue;
@@ -285,7 +299,7 @@ public class KeywordExplorer {
 		}
 		List<VectorableToken> results = new ArrayList<>();
 		for (int i = 0; i < top; i++) {
-			results.add(new VectorableToken(words[i], word2vec));
+			results.add(new VectorableToken(words[i], word2vec, IDFWeights));
 		}
 		return results;
 	}

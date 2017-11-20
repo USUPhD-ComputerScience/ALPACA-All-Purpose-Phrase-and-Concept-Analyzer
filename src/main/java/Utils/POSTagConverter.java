@@ -59,7 +59,17 @@ public class POSTagConverter {
 		}
 		return tagsequence;
 	}
-
+	public byte[] string2bytes(String posSeq) {
+		String[] patternArr = posSeq.split("_");
+		byte[] result = new byte[patternArr.length];
+		long tagsequence = 0l;
+		for (int i = 0; i < patternArr.length; i++) {
+			byte code = getCode(patternArr[i]);
+			result[i] = code;
+			//tagsequence = setTagAt(tagsequence, i, code);
+		}
+		return result;
+	}
 	public byte getCode(String tag) {
 
 		Byte code = tag2code.get(tag);

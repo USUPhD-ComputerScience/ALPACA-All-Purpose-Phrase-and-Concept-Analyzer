@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -35,7 +36,7 @@ public class KeywordAnalyzer {
 		Dataset data = Alpaca.readProcessedData("D:/projects/ALPACA/NSF/",
 				PreprocesorMain.LV2_ROOTWORD_STEMMING);
 		analyzer.calculateAndWriteKeywordScore(data,
-				PreprocesorMain.LV2_ROOTWORD_STEMMING, 1000, false);
+				PreprocesorMain.LV2_ROOTWORD_STEMMING, false);
 	}
 
 	public static final int TFIDF = 3; // tf * log(1/N+1)
@@ -48,7 +49,7 @@ public class KeywordAnalyzer {
 												// reviews
 
 	public void calculateAndWriteKeywordScore(Dataset dataset, int level,
-			int numberOfPieces, boolean isContrast) throws Exception {
+			boolean isContrast) throws Exception {
 
 		String outputFilename = FileDataAdapter.getLevelLocationDir(
 				"wordScore/", dataset.getDirectory(), level);
@@ -76,9 +77,11 @@ public class KeywordAnalyzer {
 			data4ContrastScore = new HashMap<>();
 		// List<Application> appList = appMan.getAppList();
 		// counting statistic
-		int count = 0;
+		double percentageCompleted = 0, docCompleted = 0;
+		int totalDoc = dataset.getDocumentSet().size();
+		Util.printProgress(percentageCompleted);
 		for (Document doc : dataset.getDocumentSet()) {
-			//doc.populatePreprocessedDataFromDB(level, dataset);
+			// doc.populatePreprocessedDataFromDB(level, dataset);
 			if (!doc.isEnglish())
 				continue;
 			// int docID = doc.getDocumentID();
@@ -86,17 +89,19 @@ public class KeywordAnalyzer {
 			int rating = doc.getRating();
 			countWord(termTotalScore, rating, termCount, documentCount,
 					sentences, data4ContrastScore);
-			count++;
-			if (count % 1000 == 0) {
-				System.out.println("processed " + count + " documents");
+
+			docCompleted++;
+			double newPercentage = Util.round(100*docCompleted/totalDoc, 2);
+			if(newPercentage > percentageCompleted){
+				percentageCompleted=newPercentage;
+				Util.printProgress(percentageCompleted);
 			}
 		}
-		System.out.println("processed " + count + " documents");
+		System.out.println();
 		// computing and printing to file
 		Set<String> stopwords = NatureLanguageProcessor.getInstance()
 				.getStopWordSet();
-		countFrequencyPercentile(frequencyPercentile, termCount,
-				numberOfPieces);
+		countFrequencyPercentile(frequencyPercentile, termCount);
 		PrintWriter outputFile = new PrintWriter(new File(outputFilename));
 		int totalNumberOfDoc = dataset.getDocumentSet().size();
 		Vocabulary voc = dataset.getVocabulary();
@@ -133,7 +138,7 @@ public class KeywordAnalyzer {
 		}
 		outputFile.close();
 		System.out.println("Done writing to file: " + outputFilename);
-		//System.out.println("done writing, exiting program.");
+		// System.out.println("done writing, exiting program.");
 	}
 
 	private static double[] contrast(int x1, int x2, int x3, int x4, int x5,
@@ -155,33 +160,37 @@ public class KeywordAnalyzer {
 
 	private static void countFrequencyPercentile(
 			Map<Integer, Double> frequencyPercentile,
-			Map<Integer, Integer> termCount, int numberOfPieces) {
+			Map<Integer, Integer> termCount) {
 		List<Integer> sortedFreq = new ArrayList<>(termCount.values());
-		Collections.sort(sortedFreq); // ascending order
-		int range = sortedFreq.size() / numberOfPieces;
-		List<Integer> rangeList = new ArrayList<>();
-		for (int i = 1; i < numberOfPieces; i++) {
-			rangeList.add(sortedFreq.get(i * range));
-		}
-		double smallestPercentile = 1f / numberOfPieces;
+		Collections.sort(sortedFreq); // ascending
+																	// order
+
+		// number of percentile is determined by the number of different
+		// frequencies. Ensure the smoothest scoring possible
+		Set<Integer> setOfDifferentFreq = new HashSet<>();
+		setOfDifferentFreq.addAll(sortedFreq);
+		Integer[] rangeList = setOfDifferentFreq.toArray(new Integer[0]);
+		Arrays.sort(rangeList);
+		
+		double smallestPercentile = 1f / rangeList.length;
 		for (Entry<Integer, Integer> entry : termCount.entrySet()) {
 			int freq = entry.getValue();
 			int wordID = entry.getKey();
-			for (int i = 0; i < rangeList.size(); i++) {
-				int upperVal = rangeList.get(i);
-				if (freq < upperVal) {
+			for (int i = 0; i < rangeList.length; i++) {
+				int value = rangeList[i];
+				if (freq == value) {
 					frequencyPercentile.put(wordID, smallestPercentile * i);
 					break;
 				}
 			}
-			if (frequencyPercentile.get(wordID) == null)
-				frequencyPercentile.put(wordID, 1.0);
 		}
+		
 		WeibullDistribution distribution = new WeibullDistribution(1.5, 0.78);
 
 		for (Entry<Integer, Double> entry : frequencyPercentile.entrySet()) {
 			double percentile = entry.getValue();
-			entry.setValue(distribution.density(percentile));
+			double density = distribution.density(percentile);
+			entry.setValue(density);
 		}
 	}
 

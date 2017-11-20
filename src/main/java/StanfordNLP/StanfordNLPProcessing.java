@@ -49,7 +49,7 @@ public class StanfordNLPProcessing {
 	private Properties customProps;
 	private static StanfordCoreNLP customPipeline;
 	// private static Set<?> stopWords;
-	private static final int PHRASE_MAX_SIZE = 8;
+	private static final int PHRASE_MAX_SIZE = 30;
 	private static final String[] SENTIMENT_MEANING = { "Very Negative",
 			"Negative", "Neutral", "Positive", "Very Positive" };
 	private static final HashSet<String> POSTAG_OF_NOUN = new HashSet<>(
@@ -416,7 +416,7 @@ public class StanfordNLPProcessing {
 	private List<String> travelForPhrasalVocabulary(Tree input) {
 		List<String> voc = new ArrayList<>();
 		List<Tree> leaves = input.getLeaves();
-		if (input.isPhrasal() && leaves.size() <= PHRASE_MAX_SIZE/* 10*/) {
+		if (input.isPhrasal() && leaves.size() <= PHRASE_MAX_SIZE/* 20*/) {
 			String phrase = normalizePhrase(input);
 			if (phrase.length() > 0) {
 				voc.add(phrase);

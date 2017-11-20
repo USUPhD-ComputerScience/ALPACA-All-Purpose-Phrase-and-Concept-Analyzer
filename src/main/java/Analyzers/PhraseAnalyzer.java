@@ -43,9 +43,9 @@ public class PhraseAnalyzer {
 	private static int PARSETREE = 3;
 	private static int TEMPLATE_NEW = 4;
 	private static int TEMPLATE_Len_Sent_Contrast = 5;
-	private static int NGRAM_LENGTH = 8;
+	private static int NGRAM_LENGTH = 20;
 	private List<Set<String>> categories = new ArrayList<>();
-	private static final HashSet<String> POSTAG_OF_VOCABULARY = new HashSet<>(
+	public static final HashSet<String> POSTAG_OF_VOCABULARY = new HashSet<>(
 			Arrays.asList(new String[] { "NN", "ADJP", "JJ", "VBG", "VBP",
 					"VBN", "VBZ", "VB", "NP", "VP", "NNS", "@VP" }));
 	// dist[6]: first 5 for ratings, 6th for rank of rating bad, 7th for rank of
@@ -53,16 +53,10 @@ public class PhraseAnalyzer {
 	// <monthYear, <ngram, dist>>
 	private Map<Integer, Map<String, int[]>> ngramAll = new HashMap<>();
 	private Set<Byte> interestingPOS = new HashSet<>();
-	private Set<String> connectors = new HashSet<>();
 	private Set<String> sentimentors = new HashSet<>();
-	private Set<String> negations = new HashSet<>();
-	private Set<String> intensifiers = new HashSet<>();
 	private Set<String> topicWords = new HashSet<>();
-	private Set<String> others = new HashSet<>();
-	private Set<String> whs = new HashSet<>();
-	private Set<String> interestingWords = new HashSet<>();
+	private Set<String> interestingWords = null;
 	private Set<String> essentialWords = new HashSet<>();
-	private Set<String> connNegInt = new HashSet<>();
 	private static final HashSet<String> POSTAG_OF_NOUN = new HashSet<>(
 			Arrays.asList(new String[] { "NN", "NNS", "NP" }));
 	private static final HashSet<String> POSTAG_OF_ADJECTIVE = new HashSet<>(
@@ -73,7 +67,7 @@ public class PhraseAnalyzer {
 	// private Map<String, Double> wordScore = null;
 	// private static final String SCORING_FILENAME =
 	// "D:\\projects\\ALPACA\\NSF\\wordScore\\scoreLV2.csv";
-	Set<Long> posPattern = null;
+	Set<byte[]> posPattern = null;
 	private static final Map<ImmutableList<Integer>, Integer> TRAINING_DATA_INSTANCE_FREQ = new HashMap<>();
 	static final Map<ImmutableList<Integer>, Integer> TESTING_DATA_INSTANCE_FREQ = new HashMap<>();
 
@@ -97,47 +91,26 @@ public class PhraseAnalyzer {
 		for (String pos : POSTAG_OF_NOUN) {
 			interestingPOS.add(POSconverter.getCode(pos));
 		}
-		TextNormalizer.getInstance();
-		connectors.addAll(
-				loadWordsSet(new File(TextNormalizer.getDictionaryDirectory()
-						+ "baseword/misc/connectors.txt")));
-		negations.addAll(
-				loadWordsSet(new File(TextNormalizer.getDictionaryDirectory()
-						+ "baseword/misc/negations.txt")));
-		intensifiers.addAll(
-				loadWordsSet(new File(TextNormalizer.getDictionaryDirectory()
-						+ "baseword/misc/intensifiers.txt")));
-		whs.addAll(loadWordsSet(new File(TextNormalizer.getDictionaryDirectory()
-				+ "baseword/misc/wh.txt")));
-		others.addAll(loadWordsSet(
-				new File(TextNormalizer.getDictionaryDirectory()
-						+ "baseword/misc/others.txt")));
-		connNegInt.addAll(connectors);
-		connNegInt.addAll(negations);
-		connNegInt.addAll(intensifiers);
-		interestingWords.addAll(connectors);
-		interestingWords.addAll(negations);
-		interestingWords.addAll(intensifiers);
-		interestingWords.addAll(whs);
-		interestingWords.addAll(others);
+		interestingWords = TextNormalizer.getInstance().getInterestingWords();
 		sentimentors.addAll(loadWordsSet(
 				new File("D:\\projects\\concernsReviews\\ADJ\\badWords.csv")));
 		sentimentors.addAll(loadWordsSet(
 				new File("D:\\projects\\concernsReviews\\ADJ\\goodWords.csv")));
-		//interestingWords.addAll(sentimentors);
+		// interestingWords.addAll(sentimentors);
 		List<String> topicFiles = Util
 				.listFilesForFolder("D:\\projects\\concernsReviews\\topics");
 		for (String topicFile : topicFiles) {
 			topicWords.addAll(loadWordsSet(new File(topicFile)));
 		}
-		connNegInt.addAll(others);
-		POSconverter.extendPOSLIST(connNegInt);
-		posPattern = getPOSpatterns(
-				"D:\\projects\\concernsReviews\\POSpatterns\\posPattern.csv");
-		//interestingWords.addAll(topicWords);
+		POSconverter.extendPOSLIST(interestingWords);
+		// posPattern = getPOSpatterns(
+		// "D:\\projects\\concernsReviews\\POSpatterns\\posPattern.csv");
+		// interestingWords.addAll(topicWords);
 		essentialWords.addAll(topicWords);
 		essentialWords.addAll(sentimentors);
-		essentialWords.addAll(others);
+		essentialWords.addAll(
+				loadWordsSet(new File(TextNormalizer.getDictionaryDirectory()
+						+ "baseword/misc/others.txt")));
 
 		// readData(minReviews, appMan,
 		// "D:\\projects\\concernsReviews\\appCategories\\" + TOPIC
@@ -145,15 +118,20 @@ public class PhraseAnalyzer {
 		// updatePOSTAG_DB();
 	}
 
-	public Set<Long> getPOSpatterns(String infile)
+	public void changePOSpatterns(String infile) throws FileNotFoundException {
+		System.out.println("Getting POS patterns from " + infile);
+		posPattern = getPOSpatterns(infile);
+	}
+
+	public Set<byte[]> getPOSpatterns(String infile)
 			throws FileNotFoundException {
-		Set<Long> results = new HashSet<>();
-		Scanner br = new Scanner(new FileReader(
-				"D:\\projects\\concernsReviews\\POSpatterns\\posPattern.csv"));
+		Set<byte[]> results = new HashSet<>();
+		Scanner br = new Scanner(new FileReader(infile));
 		br.nextLine();
 		while (br.hasNextLine()) {
 			String[] words = br.nextLine().split(",");
-			long pattern = POSTagConverter.getInstance().string2long(words[0]);
+			byte[] pattern = POSTagConverter.getInstance()
+					.string2bytes(words[0]);
 			results.add(pattern);
 			// int length = words[0].split("_").length;
 			// int freq = Integer.parseInt(words[1]);
@@ -210,6 +188,9 @@ public class PhraseAnalyzer {
 		if (filterSet.isEmpty())
 			return null;
 		List<String> output = new ArrayList<>();
+		double percentageCompleted = 0, docCompleted = 0;
+		int totalDoc = dataset.getDocumentSet().size();
+		Util.printProgress(percentageCompleted);
 		for (Document doc : dataset.getDocumentSet()) {
 			if (!doc.isEnglish())
 				continue;
@@ -226,7 +207,14 @@ public class PhraseAnalyzer {
 			for (Item gram : nGrams) {
 				output.add(gram.gram);
 			}
+			docCompleted++;
+			double newPercentage = Util.round(100*docCompleted/totalDoc, 2);
+			if(newPercentage > percentageCompleted){
+				percentageCompleted=newPercentage;
+				Util.printProgress(percentageCompleted);
+			}
 		}
+		System.out.println();
 		return output;
 		// calculate distributions
 		// ngramAll.putAll(ngramAll_temp);
@@ -296,7 +284,7 @@ public class PhraseAnalyzer {
 
 	// choosing phrase: log(length) * sentiment (stanford) * log(skewness).
 	public Set<Item> extractSequence_ByPattern_LENSENTCON(int[][] sentences,
-			Set<Long> patternSet, boolean actualString, Vocabulary voc,
+			Set<byte[]> patternSet, boolean actualString, Vocabulary voc,
 			Set<Integer> filterSet, Map<String, Double> wordScore)
 			throws Throwable {
 		Set<Item> sequenceSet = new HashSet<>();
@@ -397,19 +385,27 @@ public class PhraseAnalyzer {
 		private int end;
 		private boolean isTemplated;
 		private double score;
+		private int length;
+
+		static Set<String> structuralWords = TextNormalizer.getInstance()
+				.getStructuralWords();
 
 		public Seed(int s, int e) {
 			start = s;
 			end = e;
+			length = end - start + 1;
 			isTemplated = false;
 			score = -1;
 		}
 
 		public void calculateScore(Vocabulary voc, int[] wordList,
 				Map<String, Double> wordScore) throws Exception {
-			calculateScore_beta(voc, wordList, wordScore);
+			// calculateScore_beta(voc, wordList, wordScore);
+			calculateScore_gamma(voc, wordList, wordScore);
 		}
 
+		// score = log(total)/length
+		// favor strong words
 		private void calculateScore_alpha(Vocabulary voc, int[] wordList,
 				Map<String, Double> wordScore) throws Exception {
 			double sum = 0;
@@ -424,6 +420,8 @@ public class PhraseAnalyzer {
 		}
 
 		// score = sum(all individual words) * log(length)/length
+		// favor strong words but with some length (not too long)
+		// actually penalty the structure with too many stopwords
 		private void calculateScore_beta(Vocabulary voc, int[] wordList,
 				Map<String, Double> wordScore) throws Exception {
 			double sum = 0;
@@ -436,6 +434,30 @@ public class PhraseAnalyzer {
 			}
 			int length = (end - start + 1);
 			score = sum * Util.log(length, 10) / length;
+		}
+
+		// score = sum(all individual words) * log(length)/length
+		// * numberOfStructuralWords
+		// similar to beta but with structural words. Favor complex structure
+		private void calculateScore_gamma(Vocabulary voc, int[] wordList,
+				Map<String, Double> wordScore) throws Exception {
+			double sum = 0;
+			double numberOfMeaningfulWords = 0;
+			int numberOfStructuralWords = 1;
+			for (int i = start; i <= end; i++) {
+				DBWord w = voc.getWordFromDB(wordList[i]);
+				if (structuralWords.contains(w.getText())) {
+					numberOfStructuralWords++;
+				} else {
+					Double value = wordScore.get(w.getText());
+					if (value == null)
+						continue;
+					sum += value;
+					numberOfMeaningfulWords++;
+				}
+			}
+			// int length = (end - start + 1);
+			score = sum / numberOfMeaningfulWords * numberOfStructuralWords;
 		}
 	}
 
@@ -450,7 +472,7 @@ public class PhraseAnalyzer {
 
 	// modified matrix chain order to find all possible parenthesization.
 	public List<Seed> getsequence_LocalOptimal(int[] wordList,
-			Set<Long> patternSet, Vocabulary voc, Set<Integer> filterSet,
+			Set<byte[]> patternSet, Vocabulary voc, Set<Integer> filterSet,
 			Map<String, Double> wordScore) throws Throwable {
 		// step 1: find seeds (a sequence of Verb/Noun/ADJ)
 		// step 2: find seed with max score.
@@ -469,7 +491,8 @@ public class PhraseAnalyzer {
 		while (i < wordList.length) {
 			DBWord word = voc.getWordFromDB(wordList[i]);
 			String POS = POSTagConverter.getInstance().getTag(word.getPOS());
-			if (POSTAG_OF_VOCABULARY.contains(POS)) {
+			if (POSTAG_OF_VOCABULARY.contains(POS)
+					&& !interestingWords.contains(word.getText())) {
 				if (start == -1) {
 					start = i;
 				}
@@ -490,7 +513,9 @@ public class PhraseAnalyzer {
 						biggestSeed = newSeed;
 						biggestSeedLocation = seedList.size() - 1;
 					} else {
-						if ((biggestSeed == null || newSeed.score > biggestSeed.score) && containWoI) {
+						if ((biggestSeed == null
+								|| newSeed.score > biggestSeed.score)
+								&& containWoI) {
 							biggestSeed = newSeed;
 							biggestSeedLocation = seedList.size() - 1;
 						}
@@ -515,7 +540,9 @@ public class PhraseAnalyzer {
 						biggestSeedLocation = seedList.size() - 1;
 
 					} else {
-						if ((biggestSeed == null || newSeed.score > biggestSeed.score) && containWoI) {
+						if ((biggestSeed == null
+								|| newSeed.score > biggestSeed.score)
+								&& containWoI) {
 							biggestSeed = newSeed;
 							biggestSeedLocation = seedList.size() - 1;
 						}
@@ -545,20 +572,21 @@ public class PhraseAnalyzer {
 					leftNewSeed = new Seed(
 							seedList.get(biggestSeedLocation - 1).start,
 							biggestSeed.end);
+					leftNewSeed.calculateScore(voc, wordList, wordScore);
 					if (isTemplated(wordList, patternSet, leftNewSeed.start,
 							leftNewSeed.end, voc)) {
 						leftNewSeed.isTemplated = true;
 					}
-					leftNewSeed.calculateScore(voc, wordList, wordScore);
 
 				}
 				if ((biggestSeedLocation + 1) < seedList.size()) {// right
 					rightNewSeed = new Seed(biggestSeed.start,
 							seedList.get(biggestSeedLocation + 1).end);
-					if (isTemplated(wordList, patternSet, rightNewSeed.start,
-							rightNewSeed.end, voc))
-						rightNewSeed.isTemplated = true;
 					rightNewSeed.calculateScore(voc, wordList, wordScore);
+					if (isTemplated(wordList, patternSet, rightNewSeed.start,
+							rightNewSeed.end, voc)) {
+						rightNewSeed.isTemplated = true;
+					}
 				}
 			} else {
 				break; // no seed
@@ -605,11 +633,21 @@ public class PhraseAnalyzer {
 			// System.err.println();
 			seedList = tempList;
 		}
+		// int testLength = 0;
+		// for (Seed seed : templatedSeed) {
+		// if(seed.length > testLength)
+		// testLength = seed.length;
+		// }
+		// if(testLength > 8)
+		// System.err.println();
 		// step 4: choose non over-lapping longer templated seeds
 		List<Seed> results = new ArrayList<>();
 		for (Seed seed : templatedSeed) {
 			if (seed.start >= biggestStart && seed.end <= biggestEnd) {
 				// belongs to the killed range
+				if (seed.start == biggestStart && seed.end == biggestEnd)
+					if (seed.score > 0)
+						results.add(seed);
 			} else {
 				if (seed.score > 0)
 					results.add(seed);
@@ -620,7 +658,7 @@ public class PhraseAnalyzer {
 
 	// modified matrix chain order to find all possible parenthesization.
 	public SequenceScore calculateMaxSequenceScores(int[] wordList,
-			Set<Long> patternSet, int scoring, Vocabulary voc,
+			Set<byte[]> patternSet, int scoring, Vocabulary voc,
 			Map<String, Double> wordScore) throws Throwable {
 		int n = wordList.length;
 		double[][] maxCost = new double[n][n];
@@ -746,11 +784,8 @@ public class PhraseAnalyzer {
 	// ImmutableList<Integer> sequence = ImmutableList.copyOf(list);
 	// return sequence;
 	// }
-	private boolean isTemplated(int[] wordList, Set<Long> patternSet, int start,
-			int end, Vocabulary voc) throws Exception {
-		if (end - start >= 8)
-			return false;
-		long tagSeq1 = getTagSeq(wordList, start, end, voc);
+	private boolean isTemplated(int[] wordList, Set<byte[]> patternSet,
+			int start, int end, Vocabulary voc) throws Exception {
 		boolean interesting = false;
 		for (int w = start; w <= end; w++) {
 			if (essentialWords
@@ -760,34 +795,84 @@ public class PhraseAnalyzer {
 				break;
 			}
 		}
+		boolean contain = false;
+		byte[] tagSeq1 = getTagSeq(wordList, start, end, voc);
+		for (byte[] pattern : patternSet) {
+			if (pattern.length != tagSeq1.length)
+				continue;
+			boolean noGood = false;
+			for (int i = 0; i < pattern.length; i++) {
+				if (pattern[i] != tagSeq1[i]) {
+					noGood = true;
+					break;
+				}
+			}
+			if (noGood)
+				continue;
+			contain = true;
+			break;
 
-		if (patternSet.contains(tagSeq1) && interesting == true) {
+		}
+		if (contain && interesting == true) {
 			return true;
 		}
 		return false;
 	}
 
-	private long getTagSeq(int[] wordList, int start, int end, Vocabulary voc)
+	private byte[] getTagSeq(int[] wordList, int start, int end, Vocabulary voc)
 			throws Exception {
 		POSTagConverter POSconverter = POSTagConverter.getInstance();
-		long tagSeq1 = 0l;
+		List<Byte> tempList = new ArrayList<>();
+		byte mergedPOS = -1;
+		// int incremental = 0;
 		for (int w = start; w <= end; w++) {
 			String wordText = voc.getWordFromDB(wordList[w]).getText();
-			int internalIndex = w - start;
-			if (connNegInt.contains(wordText)) {
-				byte word = POSconverter.getCode(wordText);
-				tagSeq1 = POSconverter.setTagAt(tagSeq1, internalIndex, word);
+
+			if (mergedPOS == -1) {
+				if (interestingWords.contains(wordText))
+					mergedPOS = POSconverter.getCode(wordText);
+				else
+					mergedPOS = voc.getWordFromDB(wordList[w]).getPOS();
 			} else {
-				byte pos = voc.getWordFromDB(wordList[w]).getPOS();
-				tagSeq1 = POSconverter.setTagAt(tagSeq1, internalIndex, pos);
+				byte POSorWord = -1;
+				if (interestingWords.contains(wordText)) {
+					POSorWord = POSconverter.getCode(wordText);
+				} else {
+					POSorWord = voc.getWordFromDB(wordList[w]).getPOS();
+				}
+				// check if this is a continuing POS/word
+				if (mergedPOS == POSorWord) {
+					// ehhh, doing nothing
+				} else {
+					// a new word, let's put the last
+					// POS/word into the POS pattern
+					tempList.add(mergedPOS);
+					// incremental++;
+					// assign the new mergedPOS
+					mergedPOS = POSorWord;
+				}
 			}
+
+			//
+			// if (interestingWords.contains(wordText)) {
+			// byte word = POSconverter.getCode(wordText);
+			// tagSeq1 = POSconverter.setTagAt(tagSeq1, internalIndex, word);
+			// } else {
+			// byte pos = voc.getWordFromDB(wordList[w]).getPOS();
+			// tagSeq1 = POSconverter.setTagAt(tagSeq1, internalIndex, pos);
+			// }
 		}
+		// add the last POS
+		tempList.add(mergedPOS);
+		byte[] tagSeq1 = new byte[tempList.size()];
+		for (int i = 0; i < tagSeq1.length; i++)
+			tagSeq1[i] = tempList.get(i);
 		return tagSeq1;
 	}
 
 	// length * log(skewness).
 	private double computeScoreForSequence_SKEWNESS(int[] wordList,
-			Set<Long> patternSet, int start, int end, Vocabulary voc,
+			Set<byte[]> patternSet, int start, int end, Vocabulary voc,
 			Map<String, Double> wordScore) throws Throwable {
 		double score1 = 0.0d;
 		if (end - start >= 8)
@@ -828,7 +913,7 @@ public class PhraseAnalyzer {
 
 	// length * (sentimentScore+1);
 	private double computeScoreForSequence_STANFORDS_SENTIMENT(int[] wordList,
-			Set<Long> patternSet, int start, int end, Vocabulary voc)
+			Set<byte[]> patternSet, int start, int end, Vocabulary voc)
 			throws Throwable {
 		double score1 = 0.0d;
 		if (end - start >= 8)
@@ -877,7 +962,7 @@ public class PhraseAnalyzer {
 				for (int w = i; w < (i + maxIndexToGo); w++) {
 					int internalIndex = w - i;
 					String wordW = voc.getWordFromDB(sentence[w]).getText();
-					if (connNegInt.contains(wordW)) {
+					if (interestingWords.contains(wordW)) {
 						byte pos = voc.getWordFromDB(sentence[i]).getPOS();
 						if (internalIndex == 0)
 							nGramPOS[internalIndex] = postagConv.setTagAt(

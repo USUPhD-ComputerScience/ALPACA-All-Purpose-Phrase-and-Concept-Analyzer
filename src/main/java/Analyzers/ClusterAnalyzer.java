@@ -26,6 +26,7 @@ public class ClusterAnalyzer {
 	private static Map<String, Double> wordScore = null;
 	public static final int AVERAGE_JACCARD = 1;
 	public static final int AVERAGE_WORD = 2;
+	public static final int COSINE = 3;
 	private static final String SCORING_FILENAME = "D:\\projects\\ALPACA\\OLDREVIEWS\\com.facebook.orca\\wordScore\\scoreLV2.csv";
 
 	public static void readWordsSkewness(int typeOfScore, String fileName)
@@ -197,6 +198,8 @@ public class ClusterAnalyzer {
 			// leader.score = item.badScore;
 			temporaryClusterHolder.add(leader);
 			for (Item itemForReference : itemList) {
+				if(item == itemForReference)
+					continue;
 				if (itemForReference.vector == null
 						&& typeOfSimMetric == AVERAGE_WORD)
 					continue;
@@ -205,8 +208,11 @@ public class ClusterAnalyzer {
 					sim = KMeanClustering.cosineSimilarityForVectors(
 							item.vector, itemForReference.vector, true);
 				if (typeOfSimMetric == AVERAGE_JACCARD)
-					sim = phraseSimilarity_averageJaccard(itemForReference.gram,
-							itemForReference.gram, word2vec, "_");
+					sim = phraseSimilarity_averageJaccard(item.gram,
+							itemForReference.gram, word2vec, " ");
+				if (typeOfSimMetric == COSINE)
+					sim = word2vec.cosineSimilarityForVectors(item.vector,
+							itemForReference.vector, true);
 				if (sim < simThreshold)
 					continue;
 				ItemWithSim newItem = new ItemWithSim(itemForReference, sim);

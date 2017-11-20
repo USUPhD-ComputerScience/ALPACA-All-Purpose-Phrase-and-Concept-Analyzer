@@ -2,10 +2,12 @@ package TextNormalizer;
 
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.FileReader;
 import java.sql.SQLException;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Scanner;
 import java.util.Set;
@@ -25,11 +27,21 @@ public class TextNormalizer {
 	private static String DICTIONARY_DIRECTORY = "dictionary/";
 	private static String TRIGRAM_TRAINING_DIRECTORY = "dictionary/trigramTraning/";
 	private static boolean DEBUG = true;
+	private Set<String> interestingWords;
+	private Set<String> structuralWords;
 
 	private TextNormalizer() {
 		// TODO Auto-generated constructor stub
+
 	}
 
+	public Set<String> getInterestingWords() {
+		return interestingWords;
+	}
+	public Set<String> getStructuralWords() {
+		return structuralWords;
+	}
+	
 	private static void debug_println(String msg) {
 		if (DEBUG)
 			System.out.println(msg);
@@ -40,7 +52,10 @@ public class TextNormalizer {
 		Scanner br = new Scanner(new File(fileName));
 		while (br.hasNextLine()) {
 			String item = br.nextLine();
+			if(item.charAt(0) == '%')
+				continue;
 			String[] tokens = item.split("=");
+			
 			if (tokens.length == 2) {
 				String variable = tokens[0].replace(" ", "");
 				if (variable.equals("DICTIONARY_DIRECTORY")) {
@@ -61,7 +76,42 @@ public class TextNormalizer {
 			}
 		}
 		br.close();
+		interestingWords = new HashSet<>();
+		structuralWords = new HashSet<>();
+		interestingWords.addAll(
+				loadWordsSet(new File(TextNormalizer.getDictionaryDirectory()
+						+ "baseword/misc/connectors.txt")));
+		interestingWords.addAll(
+				loadWordsSet(new File(TextNormalizer.getDictionaryDirectory()
+						+ "baseword/misc/negations.txt")));
+		interestingWords.addAll(
+				loadWordsSet(new File(TextNormalizer.getDictionaryDirectory()
+						+ "baseword/misc/intensifiers.txt")));
+		interestingWords.addAll(
+				loadWordsSet(new File(TextNormalizer.getDictionaryDirectory()
+						+ "baseword/misc/wh.txt")));
+		interestingWords.addAll(
+				loadWordsSet(new File(TextNormalizer.getDictionaryDirectory()
+						+ "baseword/misc/domain.txt")));
+		structuralWords.addAll(interestingWords);
+		interestingWords.addAll(
+				loadWordsSet(new File(TextNormalizer.getDictionaryDirectory()
+						+ "baseword/misc/others.txt")));
+
 		System.out.println("DONE Reading configuration file");
+	}
+
+	private static Set<String> loadWordsSet(File testDataFile)
+			throws FileNotFoundException {
+		// TODO Auto-generated method stub
+		Set<String> results = new HashSet<>();
+		Scanner br = new Scanner(new FileReader(testDataFile));
+		while (br.hasNextLine()) {
+			String[] words = br.nextLine().split(",");
+			results.add(words[0]);
+		}
+		br.close();
+		return results;
 	}
 
 	public static String getTrigramTrainingDirectory() {
@@ -202,7 +252,7 @@ public class TextNormalizer {
 					}
 				}
 			} else {
-				if (/*pair[1].equals(",") ||*/ pair[1].equals("``")
+				if (pair[1].equals(",") || pair[1].equals("``")
 						|| pair[1].equals("''") || pair[1].equals("--")
 						|| pair[1].equals("$") || pair[1].equals("#")
 						|| pair[1].equals("SYM"))
@@ -265,6 +315,7 @@ public class TextNormalizer {
 		NatureLanguageProcessor nlp = NatureLanguageProcessor.getInstance();
 		// 0th step: lower case
 		input = input.toLowerCase();
+		input = fixORiginalCommonMistake(input);
 		// 1st step: replace words with a mapper, keep the whole format
 		List<String> tokens = NatureLanguageProcessor.wordSplit(input);
 		List<String> correctedTokens = nlp.correctUsingMap(tokens);
@@ -284,6 +335,9 @@ public class TextNormalizer {
 		return taggedTokens;
 	}
 
+	public String fixORiginalCommonMistake(String input){
+		return input.replace("n.t", " not").replace("n't", " not").replace("n. t", " not");
+	}
 	// will return null if this text is not english
 	public String[] preprocessAndSplitToTokens(String input) {
 		NatureLanguageProcessor nlp = NatureLanguageProcessor.getInstance();

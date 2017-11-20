@@ -69,6 +69,9 @@ public class PreprocesorMain {
 		// read documents for this dataset
 		System.out.println(">> Querying raw documents...");
 		Vocabulary voc = data.getVocabulary();
+		double percentageCompleted = 0, docCompleted = 0;
+		int totalDoc = data.getDocumentSet().size();
+		//Util.printProgress(percentageCompleted);
 		for (Document doc : data.getDocumentSet()) {
 			doc.setLevel(level);
 			// preprocessing part
@@ -81,21 +84,23 @@ public class PreprocesorMain {
 				csvwrt.println(doc.toString(false, voc));
 				csvwrt.println(doc.toPOSString(voc));
 				csvwrt.close();
-				if (count % 100 == 0)
-					System.out.println(">> processed " + count + " documents ("
-							+ englishCount + "/" + englishCount
-							+ " is English)");
+			}
+			docCompleted++;
+			double newPercentage = Util.round(100*docCompleted/totalDoc, 2);
+			if(newPercentage > percentageCompleted){
+				percentageCompleted=newPercentage;
+				Util.printProgress(percentageCompleted);
 			}
 
 		}
-
+		System.out.println();
 		System.out.println(">> processed " + count + " documents ("
 				+ englishCount + "/" + count + " is English)");
 		System.out.println("Writing data to database..");
 		FileDataAdapter.getInstance().writeCleansedText(data, level);
 		voc.writeToDB();
 		writeToTrainingFile(data, additionalTextFile);
-		trainWithWord2Vec(data);
+		//trainWithWord2Vec(data);
 		System.out.println(" Done! Preprocessing took "
 				+ (double) (System.currentTimeMillis() - start) / 1000 / 60
 				+ "minutes");

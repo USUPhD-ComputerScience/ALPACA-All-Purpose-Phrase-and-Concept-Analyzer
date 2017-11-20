@@ -1,7 +1,5 @@
 package Utils;
 
-
-
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -13,6 +11,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
 import java.util.List;
+import java.util.Random;
 import java.util.Set;
 
 public class Util {
@@ -27,16 +26,60 @@ public class Util {
 		});
 		return filePaths;
 	}
+	//Fisher–Yates shuffle array
+	public static void shuffleArray(int[] array)
+	{
+	    int index;
+	    Random random = new Random();
+	    for (int i = array.length - 1; i > 0; i--)
+	    {
+	        index = random.nextInt(i + 1);
+	        if (index != i)
+	        {
+	            array[index] ^= array[i];
+	            array[i] ^= array[index];
+	            array[index] ^= array[i];
+	        }
+	    }
+	}
+	//Fisher–Yates shuffle array
+	public static void shuffleArray(String[] array)
+	{
+	    int index;
+	    String temp = null;
+	    Random random = new Random();
+	    for (int i = array.length - 1; i > 0; i--)
+	    {
+	        index = random.nextInt(i + 1);
+	        if (index != i)
+	        {
+	             temp = array[index];
+	             array[index] = array[i];
+	             array[i] = temp;
+	        }
+	    }
+	}
+	// uncomment these on release to get the console progress
+	public static void printProgress(double percentage) {
+		if (percentage == 0)
+			System.out.print("(Progress) Percent completed:   0.00 %");
+		else{
+			System.out.printf("\b\b\b\b\b\b\b\b%3.2f %%", percentage);
+		}
+	}
+
 	public static String convertTime(long time) {
-        Date date = new Date(time);
-        SimpleDateFormat df2 = new SimpleDateFormat("dd/MMM/yyyy");
-        return df2.format(date);
-    }
-        public static String convertTimeDetail(long time) {
-        Date date = new Date(time);
-        SimpleDateFormat df2 = new SimpleDateFormat("hh:mm dd/MMM/yyyy");
-        return df2.format(date);
-    }
+		Date date = new Date(time);
+		SimpleDateFormat df2 = new SimpleDateFormat("dd/MMM/yyyy");
+		return df2.format(date);
+	}
+
+	public static String convertTimeDetail(long time) {
+		Date date = new Date(time);
+		SimpleDateFormat df2 = new SimpleDateFormat("hh:mm dd/MMM/yyyy");
+		return df2.format(date);
+	}
+
 	public static <T> List<T> deepCopyList(List<T> input) {
 		List<T> output = new ArrayList<>();
 		for (T item : input)
@@ -183,26 +226,31 @@ public class Util {
 		}
 		return false;
 	}
-	public static boolean hasSpecialCharacters(final CharSequence input){
+
+	public static boolean hasSpecialCharacters(final CharSequence input) {
 		for (int i = 0; i < input.length(); i++) {
 			final char c = input.charAt(i);
-			if (!(c >= '0' && c <= '9')&&!(c >= 'a' && c <= 'z')&&!(c >= 'A' && c <= 'Z')) {
+			if (!(c >= '0' && c <= '9') && !(c >= 'a' && c <= 'z')
+					&& !(c >= 'A' && c <= 'Z')) {
 				return true;
 			}
 
 		}
 		return false;
 	}
+
 	public static boolean isAscii(char ch) {
-	    return ch < 128;
+		return ch < 128;
 	}
-	public static boolean isContainingNonASCII(String word){
-		for(int i = 0; i < word.length(); i++){
-			if(word.charAt(i) >= 128)
+
+	public static boolean isContainingNonASCII(String word) {
+		for (int i = 0; i < word.length(); i++) {
+			if (word.charAt(i) >= 128)
 				return true;
 		}
 		return false;
 	}
+
 	public static boolean isSpecialCharacter(String word) {
 		switch (word) {
 		case ",":

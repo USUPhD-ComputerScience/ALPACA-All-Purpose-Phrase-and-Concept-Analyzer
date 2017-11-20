@@ -128,8 +128,8 @@ public class NatureLanguageProcessor {
 
 	private NatureLanguageProcessor() {
 		readStopWordsFromFile();
-		PoSTagger = new MaxentTagger(TextNormalizer.getDictionaryDirectory()
-				+ "POS/english-left3words-distsim.tagger");
+		PoSTagger = new MaxentTagger("file:\\"+TextNormalizer.getDictionaryDirectory()
+				+ "POS\\english-left3words-distsim.tagger");
 		try {
 			loadCorrectionMap(
 					new File(TextNormalizer.getDictionaryDirectory()
@@ -160,12 +160,12 @@ public class NatureLanguageProcessor {
 				stopWordSet.add(reader.nextLine());
 			}
 
-			PrintWriter stop = new PrintWriter(
-					TextNormalizer.getDictionaryDirectory()
-							+ "stop/englishImprovised.stop");
-			for (String w : stopWordSet)
-				stop.println(w);
-			stop.close();
+			// PrintWriter stop = new PrintWriter(
+			// TextNormalizer.getDictionaryDirectory()
+			// + "stop/englishImprovised.stop");
+			// for (String w : stopWordSet)
+			// stop.println(w);
+			// stop.close();
 		} catch (FileNotFoundException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -176,6 +176,7 @@ public class NatureLanguageProcessor {
 			if (reader != null)
 				reader.close();
 		}
+		stopWordSet.addAll(TextNormalizer.getInstance().getInterestingWords());
 	}
 
 	/**
@@ -278,13 +279,14 @@ public class NatureLanguageProcessor {
 
 		return tokenList;
 	}
+
 	public static List<String> wordSplit_wordOnly(final CharSequence input) {
 		List<String> tokenList = new ArrayList<>();
 		StringBuilder sb = null;
 		for (int i = 0; i < input.length(); i++) {
 			final char c = input.charAt(i);
 			if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
-					|| (c >= '0' && c <= '9') || (c == '_') ) {
+					|| (c >= '0' && c <= '9') || (c == '_')) {
 				if (sb == null)
 					sb = new StringBuilder();
 				sb.append(c);
@@ -292,12 +294,12 @@ public class NatureLanguageProcessor {
 				if (sb != null)
 					tokenList.add(sb.toString());
 				sb = null;
-//				if (c != ' ') {
-//					sb = new StringBuilder();
-//					sb.append(c);
-//					tokenList.add(sb.toString());
-//					sb = null;
-//				}
+				// if (c != ' ') {
+				// sb = new StringBuilder();
+				// sb.append(c);
+				// tokenList.add(sb.toString());
+				// sb = null;
+				// }
 			}
 		}
 		if (sb != null)
@@ -306,6 +308,7 @@ public class NatureLanguageProcessor {
 
 		return tokenList;
 	}
+
 	public static List<String> extractWordsFromText(String text) {
 		text = text.toLowerCase();
 		String[] words = text.split("[^a-z0-9']+");

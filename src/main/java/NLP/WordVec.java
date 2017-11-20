@@ -78,7 +78,23 @@ public class WordVec {
 			return (1 + sim / Math.sqrt(square1) / Math.sqrt(square2)) / 2;
 		}
 	}
-
+	public double cosineSimilarityForVectors(double[] vector1, double[] vector2,
+			boolean normalize) {
+		double sim = 0, square1 = 0, square2 = 0;
+		if (vector1 == null || vector2 == null) {
+			return 0;
+		}
+		for (int i = 0; i < vector1.length; i++) {
+			square1 += vector1[i] * vector1[i];
+			square2 += vector2[i] * vector2[i];
+			sim += vector1[i] * vector2[i];
+		}
+		if (!normalize) {
+			return sim / Math.sqrt(square1) / Math.sqrt(square2);
+		} else {
+			return (1 + sim / Math.sqrt(square1) / Math.sqrt(square2)) / 2;
+		}
+	}
 	private static void reformClusterELKI() throws IOException {
 		String directory = "D:\\EclipseWorkspace\\MARK\\lib\\dictionary\\word2vecTrainingData\\clusterDensity\\";
 		File fcheckExist = new File(directory);
@@ -300,6 +316,7 @@ public class WordVec {
 		Scanner br = null;
 		try {
 			br = new Scanner(new FileReader(filename));
+			br.nextLine(); // read the first useless line
 			while(br.hasNext()){
 				String word = br.next();
 				float[] vector = new float[VECTOR_SIZE];
